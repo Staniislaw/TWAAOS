@@ -1,0 +1,47 @@
+<aside class="sidebar">
+
+  <!-- Logo -->
+  <div class="sidebar-header">
+    <span class="sidebar-logo">🎓</span>
+    <div>
+      <h3>ISA-TWAOOS</h3>
+      <small>Academic Portal USV</small>
+    </div>
+  </div>
+
+  <!-- Nav principal -->
+  <nav class="sidebar-nav">
+    
+    <a
+      *ngFor="let item of navItems"
+      class="nav-item"
+      [routerLink]="item.route"
+      routerLinkActive="active"
+    >
+      <span class="nav-icon">{{ item.icon }}</span>
+      <span>{{ item.label }}</span>
+    </a>
+
+    <!-- Buton Create Event -->
+    <button class="btn-create" routerLink="/events/create">
+      <span>+</span> Creează eveniment
+    </button>
+
+  </nav>
+
+  <!-- Footer nav -->
+  <div class="sidebar-footer">
+    
+    <a
+      *ngFor="let item of footerItems"
+      class="nav-item"
+      [routerLink]="item.route"
+      routerLinkActive="active"
+    >
+      <span class="nav-icon">{{ item.icon }}</span>
+      <span>{{ item.label }}</span>
+    </a>
+
+  </div>
+
+</aside>

@@ -1,0 +1,145 @@
+<div class="page-wrapper">
+
+  <!-- SIDEBAR -->
+   <app-sidebar-component></app-sidebar-component>
+
+  <!-- MAIN -->
+  <main class="main-content">
+
+    <!-- Header -->
+    <div class="page-header">
+      <div>
+        <span class="page-label">CURATION HUB</span>
+        <h1>Academic <span class="highlight">Events Explorer</span></h1>
+      </div>
+      <div class="header-actions">
+        <button class="btn-secondary">↕ Recent adăugate</button>
+        <button class="btn-primary">⚡ Filtru avansat</button>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters-bar">
+      <div class="filter-group">
+        <label>CATEGORIE</label>
+        <select>
+          <option>Toate categoriile</option>
+          <option>Technology</option>
+          <option>Science</option>
+          <option>Design</option>
+          <option>Academic</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>FACULTATE</label>
+        <select>
+          <option>Toate</option>
+          <option>FIESC</option>
+          <option>FSE</option>
+          <option>FSEAP</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>MOD</label>
+        <select>
+          <option>Toate</option>
+          <option>In-Person</option>
+          <option>Online</option>
+          <option>Hybrid</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>STATUS</label>
+        <select>
+          <option>Toate</option>
+          <option>Deschis</option>
+          <option>Se închide curând</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Loading -->
+    <div class="loading" *ngIf="isLoading">
+      <div class="spinner"></div>
+      <p>Se încarcă evenimentele...</p>
+    </div>
+
+    <!-- Events Grid -->
+    <div class="events-grid" *ngIf="!isLoading">
+
+      <!-- Card normal -->
+      <div
+        class="event-card"
+        *ngFor="let event of events; let i = index"
+        [class.featured]="i === 3"
+        (click)="goToEvent(event.id)"
+      >
+        <!-- Card Cover -->
+        <div class="card-cover">
+          <div class="cover-gradient" [style.background]="'linear-gradient(135deg, ' + getCoverColor(event.category || 'unknown') + ')'">
+            <span class="cover-emoji">{{ getCategoryEmoji(event.category || 'unknown') }}</span>
+          </div>
+          <span class="category-badge">{{ event.category }}</span>
+        </div>
+
+        <!-- Card Body -->
+        <div class="card-body">
+          <div class="card-meta">
+            <span>🕐 {{ formatDate(event.start_datetime) }}</span>
+            <span>{{ getModeIcon(event.participation_mode || 'unknown') }} {{ event.location }}</span>
+          </div>
+
+          <h3 class="card-title">{{ event.title }}</h3>
+          <p class="card-description">{{ event.description }}</p>
+
+          <div class="card-tags">
+            <span class="tag tag-faculty">{{ event.faculty }}</span>
+            <span class="tag tag-mode">{{ event.participation_mode }}</span>
+            <span class="tag" [ngClass]="getEntryTypeClass(event.entry_type)">
+              {{ getEntryTypeLabel(event.entry_type) }}
+            </span>
+            <span class="tag" [class.tag-open]="event.status === 'active'" [class.tag-closing]="event.status === 'closing_soon'">
+              {{ getStatusLabel(event.status) }}
+            </span>
+          </div>
+
+          <div class="card-actions">
+           <button
+              class="btn-register"
+              [class.registered]="isRegistered(event.id)"
+              [disabled]="isRegistered(event.id)"
+               (click)="register(event.id); $event.stopPropagation()"
+            >
+              {{ isRegistered(event.id) ? 'Deja înscris' : 'Înregistrează-te' }}
+            </button>
+            <button class="btn-details" (click)="goToEvent(event.id); $event.stopPropagation()">Vezi detalii</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination" *ngIf="!isLoading">
+      <button class="page-btn">‹</button>
+      <button class="page-btn active">1</button>
+      <button class="page-btn">2</button>
+      <button class="page-btn">3</button>
+      <span>...</span>
+      <button class="page-btn">12</button>
+      <button class="page-btn">›</button>
+    </div>
+
+  </main>
+</div>
+
+<!-- Modal QR Code -->
+<div class="qr-modal-overlay" *ngIf="showQrModal" (click)="closeQrModal()">
+  <div class="qr-modal" (click)="$event.stopPropagation()">
+    <h3>🎫 Biletul tău QR</h3>
+    <p>Prezintă acest cod la intrare</p>
+    <img [src]="qrCodeImage" alt="QR Code" />
+    <small>Token: {{ qrToken }}</small>
+    <button (click)="closeQrModal()">Închide</button>
+  </div>
+</div>
