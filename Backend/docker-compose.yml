@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./Backend/my-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./Backend/my-api:/app
+    env_file:
+      - ./Backend/my-api/.env
+
+  frontend:
+    build: ./my-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
