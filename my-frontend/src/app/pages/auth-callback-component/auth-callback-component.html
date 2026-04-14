@@ -1,0 +1,8 @@
+<div class="callback-wrapper">
+  <div class="callback-card">
+    <div class="spinner" *ngIf="message.includes('procesează')"></div>
+    <div class="success-icon" *ngIf="message.includes('reușită')">✅</div>
+    <div class="error-icon" *ngIf="message.includes('Eroare')">❌</div>
+    <p>{{ message }}</p>
+  </div>
+</div>
