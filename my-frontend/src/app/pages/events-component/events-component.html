@@ -9,53 +9,102 @@
     <!-- Header -->
     <div class="page-header">
       <div>
-        <span class="page-label">CURATION HUB</span>
         <h1>Academic <span class="highlight">Events Explorer</span></h1>
       </div>
-      <div class="header-actions">
-        <button class="btn-secondary">↕ Recent adăugate</button>
-        <button class="btn-primary">⚡ Filtru avansat</button>
-      </div>
+      <button class="btn-secondary" (click)="toggleSort()">
+        {{ sortOrder === 'newest' ? '↕ Recent adăugate' : '↕ Cele mai vechi' }}
+      </button>
     </div>
 
     <!-- Filters -->
     <div class="filters-bar">
+      <!-- Categorie -->
       <div class="filter-group">
         <label>CATEGORIE</label>
-        <select>
-          <option>Toate categoriile</option>
-          <option>Technology</option>
-          <option>Science</option>
-          <option>Design</option>
-          <option>Academic</option>
+        <select [(ngModel)]="selectedCategory" (change)="applyFilters()">
+          <option value="">Toate categoriile</option>
+          <option *ngFor="let cat of availableCategories" [value]="cat">{{ cat }}</option>
         </select>
       </div>
+
+      <!-- Facultate -->
       <div class="filter-group">
         <label>FACULTATE</label>
-        <select>
-          <option>Toate</option>
-          <option>FIESC</option>
-          <option>FSE</option>
-          <option>FSEAP</option>
+        <select [(ngModel)]="selectedFaculty" (change)="applyFilters()">
+          <option value="">Toate</option>
+          <option *ngFor="let fac of availableFaculties" [value]="fac">{{ fac }}</option>
         </select>
       </div>
+
+      <!-- Mod participare -->
       <div class="filter-group">
         <label>MOD</label>
-        <select>
-          <option>Toate</option>
-          <option>In-Person</option>
-          <option>Online</option>
-          <option>Hybrid</option>
+        <select [(ngModel)]="selectedMode" (change)="applyFilters()">
+          <option value="">Toate</option>
+          <option value="In-Person">📍 In-Person</option>
+          <option value="Online">💻 Online</option>
+          <option value="Hybrid">🔄 Hybrid</option>
         </select>
       </div>
+
+      <!-- Status -->
       <div class="filter-group">
         <label>STATUS</label>
-        <select>
-          <option>Toate</option>
-          <option>Deschis</option>
-          <option>Se închide curând</option>
+        <select [(ngModel)]="selectedStatus" (change)="applyFilters()">
+          <option value="">Toate</option>
+          <option value="active">Deschis</option>
+          <option value="closing_soon">Se închide curând</option>
+          <option value="closed">Închis</option>
         </select>
       </div>
+
+      <!-- Organizator -->
+      <div class="filter-group">
+        <label>ORGANIZATOR</label>
+        <select [(ngModel)]="selectedOrganizer" (change)="applyFilters()">
+          <option value="">Toți organizatorii</option>
+          <option *ngFor="let org of availableOrganizers" [value]="org">{{ org }}</option>
+        </select>
+      </div>
+
+      <!-- Locatie -->
+      <div class="filter-group">
+        <label>LOCAȚIE</label>
+        <select [(ngModel)]="selectedLocation" (change)="applyFilters()">
+          <option value="">Toate locațiile</option>
+          <option *ngFor="let loc of availableLocations" [value]="loc">{{ loc }}</option>
+        </select>
+      </div>
+
+      <!-- Entry Type -->
+      <div class="filter-group">
+        <label>INTRARE</label>
+        <select [(ngModel)]="selectedEntryType" (change)="applyFilters()">
+          <option value="">Toate</option>
+          <option value="free">🟢 Intrare liberă</option>
+          <option value="registration">📝 Necesită înscriere</option>
+          <option value="qr_code">🎫 Bilet QR</option>
+        </select>
+      </div>
+
+      <!-- Data de la -->
+      <div class="filter-group">
+        <label>DE LA DATA</label>
+        <input type="date" [(ngModel)]="searchDateFrom" (change)="applyFilters()" />
+      </div>
+
+      <!-- Data până la -->
+      <div class="filter-group">
+        <label>PÂNĂ LA DATA</label>
+        <input type="date" [(ngModel)]="searchDateTo" (change)="applyFilters()" />
+      </div>
+
+      <!-- Reset -->
+      <div class="filter-group">
+        <label>&nbsp;</label>
+        <button class="btn-secondary" (click)="resetFilters()">✖ Reset filtre</button>
+      </div>
+
     </div>
 
     <!-- Loading -->
@@ -66,14 +115,12 @@
 
     <!-- Events Grid -->
     <div class="events-grid" *ngIf="!isLoading">
-
       <!-- Card normal -->
       <div
         class="event-card"
-        *ngFor="let event of events; let i = index"
+        *ngFor="let event of paginatedEvents; let i = index"
         [class.featured]="i === 3"
-        (click)="goToEvent(event.id)"
-      >
+        (click)="goToEvent(event.id)">
         <!-- Card Cover -->
         <div class="card-cover">
           <div class="cover-gradient" [style.background]="'linear-gradient(135deg, ' + getCoverColor(event.category || 'unknown') + ')'">
@@ -102,6 +149,17 @@
               {{ getStatusLabel(event.status) }}
             </span>
           </div>
+          <div class="card-sponsors" *ngIf="event.sponsors && event.sponsors.length > 0">
+            <small class="sponsors-label">Sponsori</small>
+            <div class="sponsors-row">
+              <div class="sponsor-chip" *ngFor="let sponsor of event.sponsors">
+                <img *ngIf="sponsor.logo_path" [src]="sponsor.logo_path" [alt]="sponsor.name"
+                  class="chip-logo" (error)="$any($event.target).style.display='none'" />
+                <div class="chip-initial" *ngIf="!sponsor.logo_path">{{ sponsor.name[0] }}</div>
+                <span>{{ sponsor.name }}</span>
+              </div>
+            </div>
+          </div>
 
           <div class="card-actions">
            <button
@@ -116,20 +174,21 @@
           </div>
         </div>
       </div>
+      <div class="no-results" *ngIf="!isLoading && filteredEvents.length === 0">
+        <p>Niciun eveniment gasit pentru filtrele selectate.</p>
+        <button class="btn-secondary" (click)="resetFilters()">Reset filtre</button>
+      </div>
 
     </div>
 
     <!-- Pagination -->
-    <div class="pagination" *ngIf="!isLoading">
-      <button class="page-btn">‹</button>
-      <button class="page-btn active">1</button>
-      <button class="page-btn">2</button>
-      <button class="page-btn">3</button>
-      <span>...</span>
-      <button class="page-btn">12</button>
-      <button class="page-btn">›</button>
+    <div class="pagination" *ngIf="!isLoading && totalPages > 1">
+      <button class="page-btn" (click)="goToPage(currentPage - 1)" [disabled]="currentPage === 1">‹</button>
+      <button class="page-btn"*ngFor="let page of pageNumbers"[class.active]="page === currentPage"(click)="goToPage(page)">
+        {{ page }}
+      </button>
+      <button class="page-btn" (click)="goToPage(currentPage + 1)" [disabled]="currentPage === totalPages">›</button>
     </div>
-
   </main>
 </div>
 

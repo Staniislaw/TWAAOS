@@ -114,19 +114,45 @@
                 <strong>{{ material.file_name }}</strong>
                 <small>{{ getFileSize(material.file_size_kb!) }}</small>
               </div>
-              <button class="btn-download">⬇️</button>
+              <button class="btn-download" (click)="downloadMaterial(material); $event.stopPropagation()">
+                ⬇️
+              </button>
             </div>
           </div>
         </div>
 
         <!-- Sponsors -->
         <div class="section-block">
-          <h2>🤝 Parteneri & Sponsori</h2>
+          <div class="section-title">
+            <h2>🤝 Parteneri & Sponsori</h2>
+            <span>{{ sponsors.length }} parteneri</span>
+          </div>
           <div class="sponsors-grid">
-            <div class="sponsor-card" *ngFor="let sponsor of sponsors">
-              <div class="sponsor-logo">{{ sponsor.name[0] }}</div>
-              <span>{{ sponsor.name }}</span>
-            </div>
+            <a  
+              class="sponsor-card"
+              *ngFor="let sponsor of sponsors"
+              [href]="sponsor.website_url || '#'"
+              target="_blank"
+              rel="noopener"
+            >
+              <div class="sponsor-logo-wrap">
+                <img
+                  *ngIf="sponsor.logo_path"
+                  [src]="sponsor.logo_path"
+                  [alt]="sponsor.name"
+                  class="sponsor-logo-img"
+                  (error)="$any($event.target).style.display='none'"
+                />
+                <div class="sponsor-logo" *ngIf="!sponsor.logo_path">
+                  {{ sponsor.name[0] }}
+                </div>
+              </div>
+              <div class="sponsor-info">
+                <strong>{{ sponsor.name }}</strong>
+                <small>{{ sponsor.website_url || 'Fără website' }}</small>
+              </div>
+              <span class="sponsor-arrow">→</span>
+            </a>
           </div>
         </div>
         <!-- buton vizibil doar dacă e înregistrat și event-ul are QR -->

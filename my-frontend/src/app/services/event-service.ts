@@ -125,4 +125,22 @@ export class EventService {
       { headers: this.getHeaders() }
     );
   }
+
+  uploadMaterials(eventId: number, files: File[]): Observable<any> {
+    const formData = new FormData();
+    files.forEach(file => formData.append('files', file));
+    return this.http.post(`${this.apiUrl}/${eventId}/materials`, formData);
+  }
+
+  deleteMaterial(eventId: number, materialId: number): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/${eventId}/materials/${materialId}`);
+  }
+
+  addSponsor(eventId: number, sponsor: { name: string, logo_url?: string, website_url?: string }): Observable<any> {
+    return this.http.post(`${this.apiUrl}/${eventId}/sponsors`, sponsor);
+  }
+
+  deleteSponsor(eventId: number, sponsorId: number): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/${eventId}/sponsors/${sponsorId}`);
+  }
 }

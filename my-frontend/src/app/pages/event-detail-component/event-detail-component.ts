@@ -249,9 +249,19 @@ export class EventDetailComponent implements OnInit {
             this.scanResult = err.error.detail;
           }
         });
-
       },
       (err) => {}
     );
+  }
+
+  downloadMaterial(material: EventMaterial): void {
+    const fileUrl = `http://localhost:8000/${material.file_path}`;
+    const link = document.createElement('a');
+    link.href = fileUrl;
+    link.download = material.file_name;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 }

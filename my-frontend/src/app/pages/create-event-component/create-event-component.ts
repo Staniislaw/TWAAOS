@@ -42,17 +42,16 @@ export class CreateEventComponent {
   activeMode = 'In-Person';
   unlimitedAttendees = false;
 
-  uploadedFiles = [
-    { name: 'Syllabus.pdf', size: '1.2 MB', type: 'pdf' }
-  ];
-
-  sponsors = [
-    { name: 'Microsoft Romania', website: 'microsoft.com' },
-    { name: 'Google Romania', website: 'google.com' }
-  ];
-
-  categories = ['Conference', 'Workshop', 'Seminar', 'Hackathon', 'Guest Lecture', 'Symposium'];
+  categories = ['academic','sport', 'cariera', 'voluntariat'];
   faculties = ['FIESC', 'FSE', 'FSEAP', 'FLSC', 'FIA', 'FDSA'];
+  uploadedFiles: { file: File, name: string, size: string, type: string }[] = [];
+  sponsors: { id?: number, name: string, logo_url: string, website_url: string }[] = [];
+  showSponsorDialog = false;
+  sponsorForm = { name: '', logo_url: '', website_url: '' };
+  sponsorPreviewError = false;
+  createdEventId: number | null = null;
+
+
 
   constructor(
     private router: Router,
@@ -70,10 +69,6 @@ export class CreateEventComponent {
       this.eventForm.max_participants = undefined;
     }
   }
-
-  removeFile(index: number): void { this.uploadedFiles.splice(index, 1); }
-  removeSponsor(index: number): void { this.sponsors.splice(index, 1); }
-  addSponsor(): void { this.sponsors.push({ name: 'Sponsor Nou', website: 'website.com' }); }
 
   getFileIcon(type: string): string {
     const map: any = { 'pdf': '📄', 'docx': '📝', 'pptx': '📊', 'xlsx': '📈' };
@@ -100,53 +95,139 @@ export class CreateEventComponent {
       this.errorMessage = 'Adaugă cel puțin un titlu!';
       return;
     }
-
     this.isSaving = true;
-    this.errorMessage = '';
 
-    const draftData = { ...this.eventForm, status: 'draft' };
-
-    this.eventService.createEvent(draftData).subscribe({
+    this.eventService.createEvent({ ...this.eventForm, status: 'draft' }).subscribe({
       next: (response) => {
-        this.isSaving = false;
-        this.savedMessage = 'Draft salvat!';
-        setTimeout(() => this.savedMessage = '', 3000);
+        this.createdEventId = response.id;
+        this.uploadExtras(response.id, () => {
+          this.isSaving = false;
+          this.savedMessage = 'Draft salvat!';
+          setTimeout(() => this.savedMessage = '', 3000);
+        });
       },
-      error: (err) => {
+      error: () => {
         this.isSaving = false;
         this.errorMessage = 'Eroare la salvare!';
       }
     });
   }
 
+
   // Publică evenimentul — trimite la backend cu status "active"
   publish(): void {
     if (!this.eventForm.title || !this.eventForm.start_datetime) {
-      this.errorMessage = 'Completează cel puțin titlul și data evenimentului!';
+      this.errorMessage = 'Completează titlul și data!';
       return;
     }
-
     this.isPublishing = true;
-    this.errorMessage = '';
 
-    const publishData = { ...this.eventForm, status: 'active' };
-
-    this.eventService.createEvent(publishData).subscribe({
+    this.eventService.createEvent({ ...this.eventForm, status: 'active' }).subscribe({
       next: (response) => {
-        this.isPublishing = false;
-        this.router.navigate(['/events']);
+        this.createdEventId = response.id;
+        this.uploadExtras(response.id, () => {
+          this.isPublishing = false;
+          this.router.navigate(['/events']);
+        });
       },
-      error: (err) => {
+      error: () => {
         this.isPublishing = false;
         this.errorMessage = 'Eroare la publicare!';
       }
     });
   }
 
+  uploadExtras(eventId: number, onDone: () => void): void {
+    const sponsorCalls = this.sponsors.map(s =>
+      this.eventService.addSponsor(eventId, s).toPromise()
+    );
+
+    const allCalls = [...sponsorCalls];
+
+    Promise.all(allCalls).then(() => {
+      // Fișierele le trimitem separat dacă există
+      if (this.uploadedFiles.length > 0) {
+        const files = this.uploadedFiles.map(f => f.file);
+        this.eventService.uploadMaterials(eventId, files).subscribe({
+          next: () => onDone(),
+          error: () => onDone() // continuăm chiar dacă fișierele pică
+        });
+      } else {
+        onDone();
+      }
+    });
+  }
+
+
   cancel(): void {
     this.router.navigate(['/events']);
   }
   setEntryType(type: string): void {
     this.eventForm.entry_type = type;
+  }
+  onFileDragOver(event: DragEvent): void {
+    event.preventDefault();
+  }
+
+  onFileDrop(event: DragEvent): void {
+    event.preventDefault();
+    const files = event.dataTransfer?.files;
+    if (files) this.addFiles(Array.from(files));
+  }
+
+  onFileSelect(event: any): void {
+    this.addFiles(Array.from(event.target.files));
+  }
+
+  addFiles(files: File[]): void {
+    const allowed = ['pdf', 'pptx', 'docx', 'zip'];
+    for (const file of files) {
+      const ext = file.name.split('.').pop()?.toLowerCase() || '';
+      if (!allowed.includes(ext)) continue;
+      if (file.size > 50 * 1024 * 1024) continue;
+      this.uploadedFiles.push({
+        file,
+        name: file.name,
+        size: this.formatSize(file.size),
+        type: ext
+      });
+    }
+  }
+
+  formatSize(bytes: number): string {
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  removeFile(index: number): void {
+    this.uploadedFiles.splice(index, 1);
+  }
+  openSponsorDialog(): void {
+    this.sponsorForm = { name: '', logo_url: '', website_url: '' };
+    this.showSponsorDialog = true;
+  }
+
+  addSponsor(): void {
+    this.sponsorForm = { name: '', logo_url: '', website_url: '' };
+    this.sponsorPreviewError = false;
+    this.showSponsorDialog = true;
+  }
+
+  confirmSponsor(): void {
+    if (!this.sponsorForm.name) return;
+    this.sponsors.push({ ...this.sponsorForm });
+    this.showSponsorDialog = false;
+  }
+
+
+  cancelSponsor(): void {
+    this.showSponsorDialog = false;
+  }
+
+  removeSponsor(index: number): void {
+    this.sponsors.splice(index, 1);
+  }
+  onLogoError(): void {
+    this.sponsorPreviewError = true;
   }
 }

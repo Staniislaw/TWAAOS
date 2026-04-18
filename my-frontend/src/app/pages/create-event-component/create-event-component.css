@@ -404,3 +404,130 @@
 
 .btn-publish:hover { transform: scale(1.02); }
 .btn-publish:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+
+/* Dialog Overlay */
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Dialog Box */
+.dialog-box {
+  background: white;
+  border-radius: 24px;
+  width: 480px;
+  max-width: 90vw;
+  box-shadow: 0 24px 80px rgba(0, 26, 66, 0.2);
+  animation: slideUp 0.25s ease;
+  overflow: hidden;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+/* Dialog Header */
+.dialog-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.5rem 1.75rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.dialog-icon {
+  font-size: 1.75rem;
+  width: 48px;
+  height: 48px;
+  background: #e8f0fe;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.dialog-header h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 0.1rem;
+}
+
+.dialog-header p {
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+
+.dialog-close {
+  margin-left: auto;
+  background: #f3f4f6;
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 0.85rem;
+  color: #6b7280;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.dialog-close:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+/* Dialog Body */
+.dialog-body {
+  padding: 1.5rem 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+/* Logo Preview */
+.logo-preview {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background: #f7f9fb;
+  border-radius: 10px;
+  border: 1.5px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60px;
+}
+
+.logo-preview img {
+  max-height: 50px;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+/* Dialog Footer — Salvează stânga, Anulează dreapta */
+.dialog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.75rem;
+  border-top: 1px solid #f3f4f6;
+  background: #fafafa;
+}

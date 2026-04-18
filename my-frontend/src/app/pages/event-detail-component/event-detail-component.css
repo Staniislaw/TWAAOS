@@ -293,25 +293,67 @@
   padding: 1rem;
   border-radius: 12px;
   transition: all 0.2s;
+  text-decoration: none;
+  border: 1.5px solid transparent;
 }
 
-.sponsor-card:hover { background: #e8f0fe; }
-
-.sponsor-logo {
-  width: 40px;
-  height: 40px;
+.sponsor-card:hover {
+  background: white;
+  border-color: #003d9b;
+  box-shadow: 0 4px 16px rgba(0,61,155,0.1);
+  transform: translateY(-2px);
+}
+.sponsor-logo-wrap {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
   border-radius: 10px;
-  background: linear-gradient(135deg, #003d9b, #1e429f);
-  color: white;
-  font-weight: 700;
-  font-size: 1.1rem;
+  overflow: hidden;
+  background: #f0f4ff;
   display: flex;
   align-items: center;
   justify-content: center;
+  border: 1px solid #e5e7eb;
 }
 
-.sponsor-card span { font-size: 0.85rem; font-weight: 600; color: #374151; }
+.sponsor-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 4px;
+}
 
+.sponsor-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.sponsor-info strong {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sponsor-info small {
+  font-size: 0.72rem;
+  color: #9ca3af;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.sponsor-arrow {
+  font-size: 0.9rem;
+  color: #9ca3af;
+  transition: color 0.2s;
+}
+
+.sponsor-card:hover .sponsor-arrow { color: #003d9b; }
 /* Feedback */
 .rating-avg { display: flex; align-items: center; gap: 0.25rem; }
 .star-filled { color: #f59e0b; font-size: 1.2rem; }
@@ -598,4 +640,49 @@
     opacity: 1;
     transform: scale(1);
   }
+}
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.dialog-box {
+  background: white;
+  border-radius: 16px;
+  padding: 32px;
+  width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.sponsor-logo-img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  border-radius: 6px;
+  border: 1px solid #eee;
+}
+
+.upload-zone {
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.upload-zone:hover {
+  border-color: #6366f1;
+  background: rgba(99,102,241,0.05);
 }

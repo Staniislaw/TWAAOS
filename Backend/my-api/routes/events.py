@@ -1,10 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from database.database import get_db
 from database import models
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
+import re
+import os
+import shutil
+from typing import List
+from DTO.SponsorsDTO import SponsorCreate
 
 from auth.dependencies import get_current_user
 
@@ -51,7 +56,33 @@ class EventResponse(BaseModel):
 @router.get("/")
 def get_events(db: Session = Depends(get_db)):
     events = db.query(models.Event).all()
-    return events
+    result = []
+    for event in events:
+        result.append({
+            "id": event.id,
+            "title": event.title,
+            "description": event.description,
+            "category": event.category,
+            "faculty": event.faculty,
+            "start_datetime": str(event.start_datetime) if event.start_datetime else None,
+            "end_datetime": str(event.end_datetime) if event.end_datetime else None,
+            "location": event.location,
+            "participation_mode": event.participation_mode,
+            "status": event.status,
+            "entry_type": event.entry_type,
+            "max_participants": event.max_participants,
+            "registration_deadline": str(event.registration_deadline) if event.registration_deadline else None,
+            "registration_link": event.registration_link,
+            "created_at": str(event.created_at),
+            "updated_at": str(event.updated_at),
+            "organizer_id": event.organizer_id,
+            "organizer_name": event.organizer.full_name if event.organizer else "Necunoscut",
+            "sponsors": [
+                {"name": s.name, "logo_path": s.logo_path, "website_url": s.website_url}
+                for s in event.sponsors
+            ],
+        })
+    return result
 
 # GET events by ID
 @router.get("/{event_id}")
@@ -296,3 +327,102 @@ def verify_qr(event_id: int, body: dict, db: Session = Depends(get_db), user=Dep
     db.commit()
 
     return {"valid": True, "message": "Intrare confirmată!"}
+
+# POST add sponsors
+@router.post("/{event_id}/sponsors")
+def add_sponsor(event_id: int, sponsor_data: SponsorCreate, db: Session = Depends(get_db)):
+    event = db.query(models.Event).filter(models.Event.id == event_id).first()
+    if not event:
+        raise HTTPException(status_code=404, detail="Evenimentul nu există")
+
+    sponsor = models.EventSponsor(
+        event_id=event_id,
+        name=sponsor_data.name,
+        logo_path=sponsor_data.logo_url,
+        website_url=sponsor_data.website_url
+    )
+    db.add(sponsor)
+    db.commit()
+    db.refresh(sponsor)
+    return {"message": "Sponsor adăugat!", "id": sponsor.id, "name": sponsor.name}
+#DELETE stergere sponsor dupa id
+@router.delete("/{event_id}/sponsors/{sponsor_id}")
+def delete_sponsor(event_id: int, sponsor_id: int, db: Session = Depends(get_db)):
+    sponsor = db.query(models.EventSponsor).filter(
+        models.EventSponsor.id == sponsor_id,
+        models.EventSponsor.event_id == event_id
+    ).first()
+    if not sponsor:
+        raise HTTPException(status_code=404, detail="Sponsor negăsit")
+    db.delete(sponsor)
+    db.commit()
+    return {"message": "Sponsor șters!"}
+
+# ============ MATERIALE ============
+#POST adaugare materiale
+@router.post("/{event_id}/materials")
+def upload_materials(
+    event_id: int,
+    files: List[UploadFile] = File(...),
+    db: Session = Depends(get_db)
+):
+    event = db.query(models.Event).filter(models.Event.id == event_id).first()
+    if not event:
+        raise HTTPException(status_code=404, detail="Evenimentul nu există")
+
+    upload_dir = f"uploads/events/{event_id}"
+    os.makedirs(upload_dir, exist_ok=True)
+
+    saved = []
+    for file in files:
+        safe_name = sanitize_filename(file.filename)  # ← nume curat
+        file_path = f"{upload_dir}/{safe_name}"
+
+        with open(file_path, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+
+        size_kb = os.path.getsize(file_path) // 1024
+        ext = safe_name.split(".")[-1].lower() if "." in safe_name else ""
+
+        material = models.EventMaterial(
+            event_id=event_id,
+            uploaded_by=1,
+            file_name=file.filename,   # numele original afișat în UI
+            file_type=ext,
+            file_path=file_path,       # path-ul cu nume curat pe disk
+            file_size_kb=size_kb
+        )
+        db.add(material)
+        saved.append({"name": file.filename, "size_kb": size_kb, "type": ext})
+
+    db.commit()
+    return {"message": f"{len(saved)} fișiere încărcate!", "files": saved}
+#DELETE sterge material dupa id
+@router.delete("/{event_id}/materials/{material_id}")
+def delete_material(event_id: int, material_id: int, db: Session = Depends(get_db)):
+    material = db.query(models.EventMaterial).filter(
+        models.EventMaterial.id == material_id,
+        models.EventMaterial.event_id == event_id
+    ).first()
+    if not material:
+        raise HTTPException(status_code=404, detail="Materialul negăsit")
+
+    # Șterge fișierul de pe disk
+    if os.path.exists(material.file_path):
+        os.remove(material.file_path)
+
+    db.delete(material)
+    db.commit()
+    return {"message": "Material șters!"}
+
+
+
+#HELPERS
+def sanitize_filename(filename: str) -> str:
+    # Păstrezi extensia
+    name, ext = os.path.splitext(filename)
+    # Înlocuiești orice caracter special cu underscore
+    name = re.sub(r'[^\w\-]', '_', name)
+    # Elimini underscore-uri multiple consecutive
+    name = re.sub(r'_+', '_', name)
+    return f"{name}{ext}"

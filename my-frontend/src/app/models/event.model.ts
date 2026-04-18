@@ -1,6 +1,7 @@
 export interface Event {
   id: number;
   organizer_id: number;
+  organizer_name: string;
   title: string;
   description?: string;
   start_datetime: string;
@@ -16,6 +17,7 @@ export interface Event {
   registration_deadline?: string;
   created_at: string;
   updated_at: string;
+  sponsors?: { name: string, logo_path?: string, website_url?: string }[];
 }
 
 export interface EventRegistration {

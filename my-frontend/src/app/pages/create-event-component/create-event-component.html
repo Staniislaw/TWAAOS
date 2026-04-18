@@ -169,16 +169,21 @@
         <!-- Materials -->
         <section class="form-section">
           <h2>📁 Materiale</h2>
-
-          <div class="upload-zone">
+          <div
+            class="upload-zone"
+            (dragover)="onFileDragOver($event)"
+            (drop)="onFileDrop($event)"
+            (click)="fileInput.click()"
+          >
             <span class="upload-icon">☁️</span>
-            <p>Trage fișierele aici</p>
+            <p>Trage fișierele aici sau <u>click să selectezi</u></p>
             <small>PDF, PPTX, DOCX, ZIP (Max 50MB)</small>
+            <input #fileInput type="file" hidden multiple accept=".pdf,.pptx,.docx,.zip" (change)="onFileSelect($event)" />
           </div>
 
           <div class="file-list">
             <div class="file-item" *ngFor="let file of uploadedFiles; let i = index">
-              <span class="file-icon">{{ getFileIcon('pdf') }}</span>
+              <span class="file-icon">{{ getFileIcon(file.type) }}</span>
               <div class="file-info">
                 <strong>{{ file.name }}</strong>
                 <small>{{ file.size }}</small>
@@ -197,10 +202,17 @@
 
           <div class="sponsor-list">
             <div class="sponsor-item" *ngFor="let sponsor of sponsors; let i = index">
-              <div class="sponsor-logo-mini">{{ sponsor.name[0] }}</div>
+              <img
+                *ngIf="sponsor.logo_url"
+                [src]="sponsor.logo_url"
+                class="sponsor-logo-img"
+                alt="{{ sponsor.name }}"
+                (error)="$any($event.target).style.display='none'"
+              />
+              <div class="sponsor-logo-mini" *ngIf="!sponsor.logo_url">{{ sponsor.name[0] }}</div>
               <div class="sponsor-info">
                 <strong>{{ sponsor.name }}</strong>
-                <small>{{ sponsor.website }}</small>
+                <small>{{ sponsor.website_url }}</small>
               </div>
               <button class="btn-remove" (click)="removeSponsor(i)">✕</button>
             </div>
@@ -229,4 +241,49 @@
     </div>
   </footer>
 
+</div>
+<div class="dialog-overlay" *ngIf="showSponsorDialog" (click)="cancelSponsor()">
+  <div class="dialog-box" (click)="$event.stopPropagation()">
+    
+    <!-- Header -->
+    <div class="dialog-header">
+      <div class="dialog-icon">🤝</div>
+      <div>
+        <h3>Adaugă Sponsor</h3>
+        <p>Completează informațiile sponsorului</p>
+      </div>
+      <button class="dialog-close" (click)="cancelSponsor()">✕</button>
+    </div>
+
+    <!-- Body -->
+    <div class="dialog-body">
+      <div class="field">
+        <label>Nume sponsor *</label>
+        <input type="text" [(ngModel)]="sponsorForm.name" placeholder="ex. Microsoft Romania" />
+      </div>
+
+      <div class="field">
+        <label>URL Logo</label>
+        <input type="text" [(ngModel)]="sponsorForm.logo_url" placeholder="https://example.com/logo.png" />
+        <div class="logo-preview" *ngIf="sponsorForm.logo_url">
+          <img [src]="sponsorForm.logo_url" alt="Preview"
+            (error)="$any($event.target).style.display='none'" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Website</label>
+        <input type="text" [(ngModel)]="sponsorForm.website_url" placeholder="https://microsoft.com" />
+      </div>
+    </div>
+
+    <!-- Footer — Salvează stânga, Anulează dreapta -->
+    <div class="dialog-footer">
+      <button class="btn-publish" (click)="confirmSponsor()" [disabled]="!sponsorForm.name">
+        💾 Salvează sponsor
+      </button>
+      <button class="btn-cancel" (click)="cancelSponsor()">Anulează</button>
+    </div>
+
+  </div>
 </div>

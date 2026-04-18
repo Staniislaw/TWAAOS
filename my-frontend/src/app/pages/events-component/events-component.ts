@@ -22,12 +22,6 @@ export class EventsComponent implements OnInit {
   isLoading = true;
   errorMessage = '';
 
-  // Filtre
-  selectedCategory = '';
-  selectedFaculty = '';
-  selectedMode = '';
-  selectedStatus = '';
-
   categories = ['Technology', 'Science', 'Design', 'Academic', 'Research', 'Arts'];
   faculties = ['FIESC', 'FSE', 'FSEAP', 'FLSC', 'FIA', 'FDSA'];
   modes = ['In-Person', 'Online', 'Hybrid'];
@@ -37,6 +31,19 @@ export class EventsComponent implements OnInit {
   showQrModal = false;
   qrCodeImage = '';
   qrToken = '';
+
+  //FILTERS
+  selectedCategory = '';
+  selectedFaculty = '';
+  selectedMode = '';  
+  selectedStatus = '';
+  selectedOrganizer = '';
+  selectedLocation = '';
+  selectedEntryType = '';
+  searchDateFrom = '';
+  searchDateTo = '';
+
+  sortOrder: 'newest' | 'oldest' = 'newest'; 
 
   constructor(
     private router: Router,
@@ -54,6 +61,7 @@ export class EventsComponent implements OnInit {
     this.eventService.getEvents().subscribe({
       next: (data) => {
         this.events = data;
+        this.filteredEvents = data;
         this.eventService.getMyRegisteredEventIds().subscribe({
           next: (ids) => {
             this.registeredEventIds = new Set(ids);
@@ -95,24 +103,6 @@ export class EventsComponent implements OnInit {
     this.qrToken = '';
   }
 
-  // Filtrare evenimente
-  applyFilters(): void {
-    this.filteredEvents = this.events.filter(event => {
-      const matchCategory = !this.selectedCategory || event.category === this.selectedCategory;
-      const matchFaculty = !this.selectedFaculty || event.faculty === this.selectedFaculty;
-      const matchMode = !this.selectedMode || event.participation_mode === this.selectedMode;
-      const matchStatus = !this.selectedStatus || event.status === this.selectedStatus;
-      return matchCategory && matchFaculty && matchMode && matchStatus;
-    });
-  }
-
-  resetFilters(): void {
-    this.selectedCategory = '';
-    this.selectedFaculty = '';
-    this.selectedMode = '';
-    this.selectedStatus = '';
-    this.filteredEvents = this.events;
-  }
 
   goToEvent(id: number): void {
     this.router.navigate(['/events', id]);
@@ -179,5 +169,96 @@ export class EventsComponent implements OnInit {
       'tag-registration': entryType === 'registration',
       'tag-qr':           entryType === 'qr_code'
     };
+  }
+
+  // Liste dinamice din date reale
+  get availableCategories(): string[] {
+    return [...new Set(this.events.map(e => e.category).filter(Boolean))] as string[];
+  }
+  get availableFaculties(): string[] {
+    return [...new Set(this.events.map(e => e.faculty).filter(Boolean))] as string[];
+  }
+  get availableLocations(): string[] {
+    return [...new Set(this.events.map(e => e.location).filter(Boolean))] as string[];
+  }
+  get availableOrganizers(): string[] {
+    return [...new Set(this.events.map(e => e.organizer_name).filter(Boolean))] as string[];
+  }
+  toggleSort(): void {
+    this.sortOrder = this.sortOrder === 'newest' ? 'oldest' : 'newest';
+    this.applyFilters();
+  }
+
+  // Filtrare evenimente
+  applyFilters(): void {
+    this.currentPage = 1; 
+    let filtered = this.events.filter(event => {
+      // Categorie
+      const matchCategory = !this.selectedCategory || event.category === this.selectedCategory;
+      // Facultate
+      const matchFaculty = !this.selectedFaculty || event.faculty === this.selectedFaculty;
+      // Mod participare
+      const matchMode = !this.selectedMode || event.participation_mode === this.selectedMode;
+      // Status
+      const matchStatus = !this.selectedStatus || event.status === this.selectedStatus;
+      // Organizator
+      const matchOrganizer = !this.selectedOrganizer || event.organizer_name === this.selectedOrganizer;
+      // Locatie
+      const matchLocation = !this.selectedLocation || event.location === this.selectedLocation;
+      // Entry type (intrare liberă / înscriere / QR)
+      const matchEntryType = !this.selectedEntryType || event.entry_type === this.selectedEntryType;
+      // Data — de la
+      const matchDateFrom = !this.searchDateFrom ||
+        new Date(event.start_datetime) >= new Date(this.searchDateFrom);
+      // Data — până la
+      const matchDateTo = !this.searchDateTo ||
+        new Date(event.start_datetime) <= new Date(this.searchDateTo);
+
+      return matchCategory && matchFaculty && matchMode && matchStatus
+          && matchOrganizer && matchLocation && matchEntryType
+          && matchDateFrom && matchDateTo;
+    });
+    filtered.sort((a, b) => {
+        const dateA = new Date(a.created_at).getTime();
+        const dateB = new Date(b.created_at).getTime();
+        return this.sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
+      });
+    this.filteredEvents = filtered;
+  }
+
+  resetFilters(): void {
+    this.currentPage = 1;
+    this.selectedCategory = '';
+    this.selectedFaculty = '';
+    this.selectedMode = '';
+    this.selectedStatus = '';
+    this.selectedOrganizer = '';
+    this.selectedLocation = '';
+    this.selectedEntryType = '';
+    this.searchDateFrom = '';
+    this.searchDateTo = '';
+    this.filteredEvents = this.events;
+  }
+
+  //PAGINARE
+  currentPage = 1;
+  pageSize = 5; // cate carduri pe pagina
+
+  get totalPages(): number {
+    return Math.ceil(this.filteredEvents.length / this.pageSize);
+  }
+
+  get paginatedEvents(): Event[] {
+    const start = (this.currentPage - 1) * this.pageSize;
+    return this.filteredEvents.slice(start, start + this.pageSize);
+  }
+
+  get pageNumbers(): number[] {
+    return Array.from({ length: this.totalPages }, (_, i) => i + 1);
+  }
+
+  goToPage(page: number): void {
+    if (page < 1 || page > this.totalPages) return;
+    this.currentPage = page;
   }
 }

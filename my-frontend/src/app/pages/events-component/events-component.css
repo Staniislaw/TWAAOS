@@ -417,3 +417,74 @@
   cursor: pointer;
   font-size: 14px;
 }
+
+.no-results {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+}
+
+.results-info {
+  text-align: center;
+  padding: 12px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+.card-sponsors {
+  margin-bottom: 0.75rem;
+}
+
+.sponsors-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #9ca3af;
+  letter-spacing: 0.1em;
+  display: block;
+  margin-bottom: 0.4rem;
+}
+
+.sponsors-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.sponsor-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: #faf5ff;
+  border: 1px solid #ede9fe;
+  border-radius: 20px;
+  padding: 0.25rem 0.6rem 0.25rem 0.25rem;
+}
+
+.chip-logo {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: contain;
+}
+
+.chip-initial {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #003d9b, #7c3aed);
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sponsor-chip span {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #7c3aed;
+}
