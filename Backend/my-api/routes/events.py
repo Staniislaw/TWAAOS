@@ -13,6 +13,8 @@ from DTO.SponsorsDTO import SponsorCreate
 
 from auth.dependencies import get_current_user
 
+from services.email_service import send_registration_email
+
 import uuid
 import qrcode
 import io
@@ -230,6 +232,15 @@ def register_to_event(event_id: int, db: Session = Depends(get_db), user=Depends
     db.commit()
     db.refresh(registration)
 
+    #Trimitere mail de confiramre
+    send_registration_email(
+        to_email=registration.user.email,
+        user_name=registration.user.full_name,
+        event_title=event.title,
+        event_date=str(event.start_datetime),
+        event_location=event.location or "—",
+        qr_image_base64=qr_image_base64  # None dacă nu e qr_code
+    )
     # 6. Returnezi răspunsul
     response = {"message": "Înregistrat cu succes!", "registration_id": registration.id}
 
@@ -414,6 +425,7 @@ def delete_material(event_id: int, material_id: int, db: Session = Depends(get_d
     db.delete(material)
     db.commit()
     return {"message": "Material șters!"}
+
 
 
 

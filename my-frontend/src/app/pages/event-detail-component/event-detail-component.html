@@ -92,7 +92,15 @@
           <button class="btn-registered" *ngIf="isRegistered" disabled>
             Înregistrat cu succes!
           </button>
-          <button class="btn-calendar">📆 Adaugă în calendar</button>
+          <div class="calendar-actions">
+            <button class="btn-calendar-google" (click)="addToGoogleCalendar()">
+              <img src="https://www.google.com/favicon.ico" width="16" height="16" alt="Google" />
+              Google Calendar
+            </button>
+            <button class="btn-calendar-ics" (click)="exportIcs()">
+              📅 Export .ics
+            </button>
+          </div>
         </div>
       </div>
     </section>

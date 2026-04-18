@@ -264,4 +264,60 @@ export class EventDetailComponent implements OnInit {
     link.click();
     document.body.removeChild(link);
   }
+  // Google Calendar
+  addToGoogleCalendar(): void {
+    if (!this.event) return;
+
+    const start = new Date(this.event.start_datetime)
+      .toISOString().replace(/-|:|\.\d{3}/g, '');
+    const end = this.event.end_datetime
+      ? new Date(this.event.end_datetime).toISOString().replace(/-|:|\.\d{3}/g, '')
+      : start;
+
+    const params = new URLSearchParams({
+      action: 'TEMPLATE',
+      text: this.event.title,
+      dates: `${start}/${end}`,
+      details: this.event.description || '',
+      location: this.event.location || '',
+    });
+
+    const url = `https://calendar.google.com/calendar/render?${params.toString()}`;
+    window.open(url, '_blank');
+  }
+
+  // Export .ics
+  exportIcs(): void {
+    if (!this.event) return;
+
+    const start = new Date(this.event.start_datetime)
+      .toISOString().replace(/-|:|\.\d{3}/g, '');
+    const end = this.event.end_datetime
+      ? new Date(this.event.end_datetime).toISOString().replace(/-|:|\.\d{3}/g, '')
+      : start;
+
+    const ics = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//USV Events//RO',
+      'BEGIN:VEVENT',
+      `UID:event-${this.event.id}@usv.ro`,
+      `DTSTAMP:${new Date().toISOString().replace(/-|:|\.\d{3}/g, '')}`,
+      `DTSTART:${start}`,
+      `DTEND:${end}`,
+      `SUMMARY:${this.event.title}`,
+      `DESCRIPTION:${(this.event.description || '').replace(/\n/g, '\\n')}`,
+      `LOCATION:${this.event.location || ''}`,
+      'END:VEVENT',
+      'END:VCALENDAR'
+    ].join('\r\n');
+
+    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${this.event.title.replace(/\s+/g, '_')}.ics`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
 }
