@@ -25,8 +25,6 @@ app.include_router(protected.router)
 app.include_router(users.router)
 app.include_router(events.router)
 
-
-
 class LoginRequest(BaseModel):
     username: str
     password: str
