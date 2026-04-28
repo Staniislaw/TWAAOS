@@ -21,29 +21,39 @@ export class LoginComponent {
   constructor(private authService: AuthService, private router: Router) {}
 
   login(): void {
-    if (!this.username || !this.password) {
-      this.errorMessage = 'Completeaza toate campurile!';
-      return;
-    }
+    if (!this.username || !this.password) return;
 
     this.isLoading = true;
+
     this.authService.login(this.username, this.password).subscribe({
       next: (response) => {
-        if (response.access_token) {
-          this.authService.saveToken(response.access_token);
-          this.router.navigate(['/events']);
-        } else {
-          this.errorMessage = 'Credentiale incorecte!';
-        }
+        this.authService.saveToken(response.access_token);
+        this.router.navigate(['/events']);
         this.isLoading = false;
       },
       error: () => {
-        this.errorMessage = 'Eroare la conectare!';
+        this.errorMessage = 'Eroare la login';
         this.isLoading = false;
       }
     });
   }
+  register(): void {
+    if (!this.username || !this.password) return;
 
+    this.isLoading = true;
+
+    this.authService.register(this.username, this.password).subscribe({
+      next: () => {
+        this.errorMessage = 'Cont creat! Acum te poți loga.';
+        this.activeTab = 'signin';
+        this.isLoading = false;
+      },
+      error: () => {
+        this.errorMessage = 'User deja există';
+        this.isLoading = false;
+      }
+    });
+  }
   loginWithGoogle(): void {
     this.authService.loginWithGoogle();
   }

@@ -23,9 +23,9 @@
     </a>
 
     <!-- Buton Create Event -->
-    <button class="btn-create" routerLink="/events/create">
-      <span>+</span> Creează eveniment
-    </button>
+   <button *ngIf="userRole === 'organizer' || userRole === 'admin'" class="btn-create" routerLink="/events/create">
+    <span>+</span> Creează eveniment
+  </button>
 
   </nav>
 

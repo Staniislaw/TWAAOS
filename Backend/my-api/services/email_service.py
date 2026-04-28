@@ -1,5 +1,3 @@
-# services/email_service.py — înlocuiește complet
-
 import smtplib
 import base64
 from email.mime.multipart import MIMEMultipart

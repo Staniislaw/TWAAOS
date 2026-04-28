@@ -6,6 +6,7 @@ import { Event, EventFeedback, EventMaterial, EventSponsor } from '../../models/
 import { SidebarComponent } from '../../layout/sidebar-component/sidebar-component';
 import { EventService } from '../../services/event-service';
 import { Html5Qrcode } from 'html5-qrcode';
+import { AuthService } from '../../services/auth';
 
 @Component({
   selector: 'app-event-detail-component',
@@ -33,16 +34,19 @@ export class EventDetailComponent implements OnInit {
   isLoadingQr = false;
   manualToken: string = '';
   scanResult: string = '';
+  userRole: string | null = null;
 
 
   constructor(
     private route: ActivatedRoute,
     private router: Router,
     private eventService: EventService,
-     @Inject(PLATFORM_ID) private platformId: Object
+    @Inject(PLATFORM_ID) private platformId: Object,
+    private authService: AuthService
   ) {}
 
   ngOnInit(): void {
+    this.userRole = this.authService.getUserRole();
     this.route.paramMap.subscribe(params => {
       const id = Number(params.get('id'));
       if (!id || isNaN(id)) return;
@@ -102,10 +106,29 @@ export class EventDetailComponent implements OnInit {
       error: () => this.sponsors = []
     });
   }
+  toggleRegistration(): void {
+    if (this.isRegistered) {
+      this.unregister();
+    } else {
+      this.register();
+    }
+  }
   register(): void {
     if (!this.event) return;
     this.eventService.registerToEvent(this.event.id).subscribe({
       next: () => this.isRegistered = true,
+    });
+  }
+  unregister(): void {
+    if (!this.event) return;
+
+    this.eventService.unregisterFromEvent(this.event.id).subscribe({
+      next: () => {
+        this.isRegistered = false;
+      },
+      error: () => {
+        console.error("Eroare la dezabonare");
+      }
     });
   }
 

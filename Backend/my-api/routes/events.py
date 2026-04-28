@@ -250,6 +250,24 @@ def register_to_event(event_id: int, db: Session = Depends(get_db), user=Depends
 
     return response
 
+@router.delete("/{event_id}/register")
+def unregister_from_event(event_id: int,db: Session = Depends(get_db),user=Depends(get_current_user)):
+    user_id = user["user_id"]
+
+    registration = db.query(models.EventRegistration).filter(
+        models.EventRegistration.event_id == event_id,
+        models.EventRegistration.user_id == user_id
+    ).first()
+
+    if not registration:
+        raise HTTPException(status_code=404, detail="Nu ești înscris la acest eveniment")
+
+    db.delete(registration)
+
+    db.commit()
+
+    return {"message": "Te-ai deziscris cu succes"}
+
 # POST feedback event
 @router.post("/{event_id}/feedback")
 def submit_feedback(event_id: int, feedback_data: dict, db: Session = Depends(get_db)):

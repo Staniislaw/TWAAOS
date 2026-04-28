@@ -81,16 +81,12 @@
             <span class="tag tag-open" *ngIf="event.status === 'active'">Deschis</span>
           </div>
 
-         <button
+          <button
             class="btn-register-main"
-            (click)="register()"
-            [disabled]="isRegistered"
+            (click)="toggleRegistration()"
             [class.registered]="isRegistered"
           >
-            {{ isRegistered ? 'Deja înscris' : 'Înregistrează-te' }}
-          </button>
-          <button class="btn-registered" *ngIf="isRegistered" disabled>
-            Înregistrat cu succes!
+            {{ isRegistered ? 'Renunță la înscriere' : 'Înregistrează-te' }}
           </button>
           <div class="calendar-actions">
             <button class="btn-calendar-google" (click)="addToGoogleCalendar()">
@@ -189,7 +185,7 @@
             </div>
           </div>
           <!-- VERIFICARE -->
-          <div class="verify-card">
+          <div *ngIf="userRole === 'organizer'" class="verify-card">
             <h3>🔍 Verificare bilet</h3>
 
             <input 

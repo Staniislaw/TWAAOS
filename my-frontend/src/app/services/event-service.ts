@@ -89,6 +89,13 @@ export class EventService {
       { headers: this.getHeaders() }
     );
   }
+  //Unresgit from event
+  unregisterFromEvent(eventId: number): Observable<any> {
+    return this.http.delete(
+      `${this.apiUrl}/${eventId}/register`,
+      { headers: this.getHeaders() }
+    );
+  }
 
   // Trimite feedqback
   submitFeedback(eventId: number, rating: number, comment: string): Observable<any> {
@@ -143,4 +150,6 @@ export class EventService {
   deleteSponsor(eventId: number, sponsorId: number): Observable<any> {
     return this.http.delete(`${this.apiUrl}/${eventId}/sponsors/${sponsorId}`);
   }
+
+ 
 }

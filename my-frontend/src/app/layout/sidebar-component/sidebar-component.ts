@@ -11,6 +11,8 @@ import { CommonModule } from '@angular/common';
   styleUrl: './sidebar-component.css',
 })
 export class SidebarComponent {
+  userRole: string | null = null;
+
   navItems = [
     { label: 'Evenimente', icon: '📅', route: '/events' },
     { label: 'Home', icon: '🏠', route: '/home' },
@@ -23,4 +25,11 @@ export class SidebarComponent {
     { label: 'Setări', icon: '⚙️', route: '/settings' },
     { label: 'Deconectare', icon: '🚪', route: '/login' },
   ];
+  ngOnInit() {
+    const token = localStorage.getItem('access_token'); 
+    if (token) {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      this.userRole = payload.role;
+    }
+  }
 }

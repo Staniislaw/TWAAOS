@@ -37,19 +37,19 @@
         </div>
       </div>
 
-      <div class="form-group" *ngIf="activeTab === 'signin'">
+      <div class="form-group">
         <div class="input-wrapper">
           <span class="input-icon">🔒</span>
           <input
             type="password"
             [(ngModel)]="password"
             placeholder="Parolă"
-            (keyup.enter)="login()"
+            (keyup.enter)="activeTab === 'signin' ? login() : register()"
           />
         </div>
       </div>
 
-      <button class="btn-main" (click)="login()" [disabled]="isLoading">
+      <button class="btn-main" (click)="activeTab === 'signin' ? login() : register()" [disabled]="isLoading">
         <span *ngIf="!isLoading">{{ activeTab === 'signin' ? 'Autentifică-te' : 'Înregistrează-te' }}</span>
         <span *ngIf="isLoading">Se încarcă...</span>
       </button>

@@ -5,7 +5,7 @@ from fastapi.staticfiles import StaticFiles
 import os
 from auth.jwt_handler import create_access_token
 from auth.google_auth import get_google_auth_url, get_google_token, get_google_user
-from routes import protected,users,events
+from routes import protected,users,events,auth
 from pydantic import BaseModel
 from database.database import engine, SessionLocal
 from database import models
@@ -27,6 +27,7 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 app.include_router(protected.router)
 app.include_router(users.router)
 app.include_router(events.router)
+app.include_router(auth.router)
 
 class LoginRequest(BaseModel):
     username: str
@@ -54,18 +55,24 @@ async def google_callback(code: str):
     access_token_google = token_data.get("access_token")
     user_info = await get_google_user(access_token_google)
 
+    email = user_info.get("email")
+
+    # Rol automat după email
+    if email.endswith("@usv.ro"):
+        role = "student"
+    else:
+        role = "organizer"  # alte emailuri Google
+
     db = SessionLocal()
     try:
-        user = db.query(models.User).filter(
-            models.User.email == user_info.get("email")
-        ).first()
-
+        user = db.query(models.User).filter(models.User.email == email).first()
         if not user:
             user = models.User(
                 full_name=user_info.get("name"),
-                email=user_info.get("email"),
+                email=email,
                 oauth_provider="google",
-                is_active=True
+                is_active=True,
+                role=role  # ← rol automat
             )
             db.add(user)
             db.commit()
@@ -74,12 +81,12 @@ async def google_callback(code: str):
         db.close()
 
     jwt_token = create_access_token({
-        "sub": user_info.get("email"),
+        "sub": email,
         "user_id": user.id,
         "name": user_info.get("name"),
-        "picture": user_info.get("picture")
+        "picture": user_info.get("picture"),
+        "role": user.role  # ← rol în JWT
     })
 
-    # Folosim 303 See Other in loc de 307
-    frontend_url = f"http://localhost:4200/auth/callback?token={jwt_token}&name={user_info.get('name')}&email={user_info.get('email')}"
+    frontend_url = f"http://localhost:4200/auth/callback?token={jwt_token}&name={user_info.get('name')}&email={email}"
     return RedirectResponse(url=frontend_url, status_code=303)

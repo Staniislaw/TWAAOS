@@ -19,10 +19,6 @@ export class AuthService {
     this.isBrowser = isPlatformBrowser(platformId);
   }
 
-  login(username: string, password: string): Observable<any> {
-    return this.http.post(`${this.apiUrl}/token`, { username, password });
-  }
-
   loginWithGoogle(): void {
     if (this.isBrowser) {
       window.location.href = `${this.apiUrl}/auth/google`;
@@ -45,6 +41,14 @@ export class AuthService {
     }
     return null;
   }
+  getUserRole(): string | null {
+    const token = localStorage.getItem('access_token');
+
+    if (!token) return null;
+
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.role;
+  }
 
   isLoggedIn(): boolean {
     return !!this.getToken();
@@ -64,5 +68,18 @@ export class AuthService {
       localStorage.removeItem('user');
     }
     this.router.navigate(['/login']);
+  }
+  login(username: string, password: string) {
+    return this.http.post<{ access_token: string }>(
+        `${this.apiUrl}/auth/login`,
+        { username, password }
+    );
+  }
+
+  register(username: string, password: string) {
+    return this.http.post(`${this.apiUrl}/auth/register`, {
+      username,
+      password
+    });
   }
 }
