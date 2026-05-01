@@ -56,6 +56,7 @@ class EventRegistration(Base):
     event_id = Column(Integer, ForeignKey("events.id"))
     user_id = Column(Integer, ForeignKey("users.id"))
     status = Column(String, default="registered")
+    waitlist_position = Column(Integer, nullable=True)
     qr_code_token = Column(String, nullable=True)
     checked_in = Column(Boolean, default=False)
     checked_in_at = Column(DateTime, nullable=True)

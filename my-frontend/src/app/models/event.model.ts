@@ -18,6 +18,13 @@ export interface Event {
   created_at: string;
   updated_at: string;
   sponsors?: { name: string, logo_path?: string, website_url?: string }[];
+  sentiment?: {
+    label: string;
+    color: string;
+    emoji: string;
+  };
+  avg_rating?: number;
+  feedback_count?: number;
 }
 
 export interface EventRegistration {

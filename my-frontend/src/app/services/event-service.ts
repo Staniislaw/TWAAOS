@@ -85,15 +85,17 @@ export class EventService {
   // Inregistrare la eveniment
   registerToEvent(eventId: number): Observable<any> {
     return this.http.post(
-      `${this.apiUrl}/${eventId}/register`, {},
+      `${this.apiUrl}/${eventId}/register`,
+      {},
       { headers: this.getHeaders() }
     );
   }
+
   //Unresgit from event
   unregisterFromEvent(eventId: number): Observable<any> {
     return this.http.delete(
-      `${this.apiUrl}/${eventId}/register`,
-      { headers: this.getHeaders() }
+      `${this.apiUrl}/${eventId}/unregister`,
+      { headers: this.getHeaders() }  
     );
   }
 
@@ -111,8 +113,8 @@ export class EventService {
       headers: this.getHeaders()
     });
   }
-  isRegistered(eventId: number): Observable<{ registered: boolean }> {
-    return this.http.get<{ registered: boolean }>(
+  isRegistered(eventId: number): Observable<{ registered: boolean, status: string, waitlist_position: number | null }> {
+    return this.http.get<{ registered: boolean, status: string, waitlist_position: number | null }>(
       `${this.apiUrl}/${eventId}/is-registered`,
       { headers: this.getHeaders() }
     );

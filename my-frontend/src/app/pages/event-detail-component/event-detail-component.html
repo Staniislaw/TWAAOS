@@ -67,9 +67,7 @@
               <div class="avatar">M</div>
               <div class="avatar">A</div>
             </div>
-          <span>
-            +{{ (event.max_participants ?? 0) - 23 }} înregistrați
-          </span>
+            <span>+{{ (event.max_participants ?? 0) - 23 }} înregistrați</span>
           </div>
 
           <div class="tags-row">
@@ -81,13 +79,25 @@
             <span class="tag tag-open" *ngIf="event.status === 'active'">Deschis</span>
           </div>
 
-          <button
-            class="btn-register-main"
-            (click)="toggleRegistration()"
-            [class.registered]="isRegistered"
-          >
-            {{ isRegistered ? 'Renunță la înscriere' : 'Înregistrează-te' }}
-          </button>
+          <!-- Înregistrat normal -->
+          <ng-container *ngIf="registrationStatus === 'registered'">
+            <button class="btn-registered" disabled>✅ Înregistrat</button>
+            <button class="btn-unregister" (click)="unregister()">Renunță la înscriere</button>
+          </ng-container>
+
+          <!-- Pe waitlist -->
+          <ng-container *ngIf="registrationStatus === 'waitlist'">
+            <div class="waitlist-badge">⏳ Lista de așteptare — poziția #{{ waitlistPosition }}</div>
+            <button class="btn-unregister" (click)="unregister()">Renunță la loc</button>
+          </ng-container>
+
+          <!-- Neînregistrat -->
+          <ng-container *ngIf="registrationStatus === '' || registrationStatus === 'cancelled'">
+            <button class="btn-register-main" (click)="register()">
+              {{ eventIsFull ? '⏳ Intră în lista de așteptare' : 'Înregistrează-te' }}
+            </button>
+          </ng-container>
+
           <div class="calendar-actions">
             <button class="btn-calendar-google" (click)="addToGoogleCalendar()">
               <img src="https://www.google.com/favicon.ico" width="16" height="16" alt="Google" />
@@ -219,6 +229,11 @@
         <div class="section-block">
           <div class="section-title">
             <h2>⭐ Feedback</h2>
+            <div class="sentiment-inline"
+              *ngIf="event && event.sentiment && event.feedback_count && event.feedback_count > 0"
+              [ngClass]="'sentiment-' + event.sentiment.color">
+              {{ event.sentiment.emoji }} {{ event.sentiment.label }}
+            </div>
             <div class="rating-avg">
               <span class="star-filled">★</span>
               <strong>{{ getAverageRating() }}</strong>

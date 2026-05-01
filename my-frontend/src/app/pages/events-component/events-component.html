@@ -127,6 +127,11 @@
             <span class="cover-emoji">{{ getCategoryEmoji(event.category || 'unknown') }}</span>
           </div>
           <span class="category-badge">{{ event.category }}</span>
+          <div class="sentiment-badge-cover"
+            *ngIf="event.sentiment && event.feedback_count && event.feedback_count > 0"
+            [ngClass]="'sentiment-' + event.sentiment.color">
+            {{ event.sentiment.emoji }} {{ event.sentiment.label }}
+          </div>
         </div>
 
         <!-- Card Body -->

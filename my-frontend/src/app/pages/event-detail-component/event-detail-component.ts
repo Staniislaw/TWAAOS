@@ -37,6 +37,10 @@ export class EventDetailComponent implements OnInit {
   userRole: string | null = null;
 
 
+  registrationStatus: string = ''; 
+  waitlistPosition: number = 0;
+  eventIsFull: boolean = false;
+
   constructor(
     private route: ActivatedRoute,
     private router: Router,
@@ -80,12 +84,12 @@ export class EventDetailComponent implements OnInit {
     this.eventService.isRegistered(eventId).subscribe({
       next: (res) => {
         this.isRegistered = res.registered;
-      },
-      error: () => {
-        this.isRegistered = false;
+        this.registrationStatus = res.status || '';
+        this.waitlistPosition = res.waitlist_position || 0;
       }
     });
   }
+
   loadMaterials(id: number): void {
     this.eventService.getEventMaterials(id).subscribe({
       next: (data) => this.materials = data,
@@ -116,21 +120,36 @@ export class EventDetailComponent implements OnInit {
   register(): void {
     if (!this.event) return;
     this.eventService.registerToEvent(this.event.id).subscribe({
-      next: () => this.isRegistered = true,
+      next: (response) => {
+        this.registrationStatus = response.status; 
+        this.isRegistered = true;
+
+        if (response.status === 'waitlist') {
+          this.waitlistPosition = response.waitlist_position;
+        }
+
+        if (response.qr_code) {
+          this.qrCodeImage = response.qr_code;
+          this.qrToken = response.qr_token;
+          this.showQrModal = true;
+        }
+      },
+      error: (err) => {
+        console.error(err);
+      }
     });
   }
   unregister(): void {
     if (!this.event) return;
-
     this.eventService.unregisterFromEvent(this.event.id).subscribe({
       next: () => {
         this.isRegistered = false;
-      },
-      error: () => {
-        console.error("Eroare la dezabonare");
+        this.registrationStatus = '';
+        this.waitlistPosition = 0;
       }
     });
   }
+
 
   submitFeedback(): void {
     if (this.selectedRating === 0 || !this.newComment.trim() || !this.event) return;

@@ -13,7 +13,7 @@ from DTO.SponsorsDTO import SponsorCreate
 
 from auth.dependencies import get_current_user
 
-from services.email_service import send_registration_email
+from services.email_service import send_registration_email,send_promoted_from_waitlist_email,send_waitlist_email
 
 import uuid
 import qrcode
@@ -60,6 +60,7 @@ def get_events(db: Session = Depends(get_db)):
     events = db.query(models.Event).all()
     result = []
     for event in events:
+        sentiment = get_sentiment(event.feedbacks)
         result.append({
             "id": event.id,
             "title": event.title,
@@ -83,16 +84,29 @@ def get_events(db: Session = Depends(get_db)):
                 {"name": s.name, "logo_path": s.logo_path, "website_url": s.website_url}
                 for s in event.sponsors
             ],
+            "sentiment": sentiment,
+            "avg_rating": round(sum(f.rating for f in event.feedbacks) / len(event.feedbacks),
+                                1) if event.feedbacks else None,
+            "feedback_count": len(event.feedbacks),
         })
     return result
 
-# GET events by ID
+# GET events by ID with feedBacks sentiments
 @router.get("/{event_id}")
 def get_event(event_id: int, db: Session = Depends(get_db)):
     event = db.query(models.Event).filter(models.Event.id == event_id).first()
     if not event:
         raise HTTPException(status_code=404, detail="Evenimentul nu a fost găsit")
-    return event
+    sentiment = get_sentiment(event.feedbacks)
+    return {
+        "id": event.id,
+        "title": event.title,
+        # ... toate câmpurile existente ...
+        "sentiment": sentiment,
+        "avg_rating": round(sum(f.rating for f in event.feedbacks) / len(event.feedbacks),
+                            1) if event.feedbacks else None,
+        "feedback_count": len(event.feedbacks),
+    }
 
 # POST new event
 @router.post("/")
@@ -189,18 +203,52 @@ def register_to_event(event_id: int, db: Session = Depends(get_db), user=Depends
     # 2. Verifici dacă userul e deja înregistrat
     existing = db.query(models.EventRegistration).filter(
         models.EventRegistration.event_id == event_id,
-        models.EventRegistration.user_id == user_id
+        models.EventRegistration.user_id == user_id,
+        models.EventRegistration.status.in_(["registered", "waitlist"])
     ).first()
     if existing:
         raise HTTPException(status_code=400, detail="Ești deja înregistrat la acest eveniment!")
 
+    # Numarare locurile ocupate (doar "registered", nu waitlist)
+    registered_count = db.query(models.EventRegistration).filter(
+        models.EventRegistration.event_id == event_id,
+        models.EventRegistration.status == "registered"
+    ).count()
+
     # 3. Verifici dacă mai sunt locuri
-    if event.max_participants:
-        count = db.query(models.EventRegistration).filter(
-            models.EventRegistration.event_id == event_id
+    is_full = event.max_participants and registered_count >= event.max_participants
+
+    if is_full:
+        # Calculezi poziția în waitlist
+        waitlist_count = db.query(models.EventRegistration).filter(
+            models.EventRegistration.event_id == event_id,
+            models.EventRegistration.status == "waitlist"
         ).count()
-        if count >= event.max_participants:
-            raise HTTPException(status_code=400, detail="Evenimentul este complet!")
+
+        registration = models.EventRegistration(
+            event_id=event_id,
+            user_id=user_id,
+            status="waitlist",
+            waitlist_position=waitlist_count + 1,
+            qr_code_token=None,
+        )
+        db.add(registration)
+        db.commit()
+
+        # Trimite email waitlist
+        db_user = db.query(models.User).filter(models.User.id == user_id).first()
+        send_waitlist_email(
+            to_email=db_user.email,
+            user_name=db_user.full_name,
+            event_title=event.title,
+            position=waitlist_count + 1
+        )
+
+        return {
+            "message": f"Evenimentul e complet! Ești pe lista de așteptare pe poziția {waitlist_count + 1}.",
+            "status": "waitlist",
+            "waitlist_position": waitlist_count + 1
+        }
 
     # 4. Generezi QR token DOAR dacă entry_type == "qr_code"
     qr_token = None
@@ -232,17 +280,19 @@ def register_to_event(event_id: int, db: Session = Depends(get_db), user=Depends
     db.commit()
     db.refresh(registration)
 
+
+    db_user = db.query(models.User).filter(models.User.id == user_id).first()
     #Trimitere mail de confiramre
     send_registration_email(
-        to_email=registration.user.email,
-        user_name=registration.user.full_name,
+        to_email=db_user.email,
+        user_name=db_user.full_name,
         event_title=event.title,
         event_date=str(event.start_datetime),
         event_location=event.location or "—",
-        qr_image_base64=qr_image_base64  # None dacă nu e qr_code
+        qr_image_base64=qr_image_base64
     )
     # 6. Returnezi răspunsul
-    response = {"message": "Înregistrat cu succes!", "registration_id": registration.id}
+    response = {"message": "Înregistrat cu succes!", "status": "registered", "registration_id": registration.id}
 
     if qr_image_base64:
         response["qr_code"] = f"data:image/png;base64,{qr_image_base64}"
@@ -250,23 +300,83 @@ def register_to_event(event_id: int, db: Session = Depends(get_db), user=Depends
 
     return response
 
-@router.delete("/{event_id}/register")
-def unregister_from_event(event_id: int,db: Session = Depends(get_db),user=Depends(get_current_user)):
+@router.delete("/{event_id}/unregister")
+def unregister_from_event(event_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
     user_id = user["user_id"]
 
+    # ← caută atât "registered" cât și "waitlist"
     registration = db.query(models.EventRegistration).filter(
         models.EventRegistration.event_id == event_id,
-        models.EventRegistration.user_id == user_id
+        models.EventRegistration.user_id == user_id,
+        models.EventRegistration.status.in_(["registered", "waitlist"])
     ).first()
 
     if not registration:
-        raise HTTPException(status_code=404, detail="Nu ești înscris la acest eveniment")
+        raise HTTPException(status_code=404, detail="Nu ești înregistrat la acest eveniment!")
+
+    was_registered = registration.status == "registered"  # ← reține dacă era registered
+
+    event = db.query(models.Event).filter(models.Event.id == event_id).first()
 
     db.delete(registration)
+    db.flush()
+
+    # Promovezi din waitlist DOAR dacă cel care pleacă era "registered"
+    # (dacă era pe waitlist, nu se eliberează un loc real)
+    if was_registered:
+        next_in_waitlist = db.query(models.EventRegistration).filter(
+            models.EventRegistration.event_id == event_id,
+            models.EventRegistration.status == "waitlist"
+        ).order_by(models.EventRegistration.waitlist_position).first()
+
+        if next_in_waitlist:
+            qr_token = None
+            qr_image_base64 = None
+
+            if event.entry_type == "qr_code":
+                qr_token = str(uuid.uuid4())
+                qr = qrcode.QRCode(version=1, box_size=10, border=4)
+                qr.add_data(qr_token)
+                qr.make(fit=True)
+                img = qr.make_image(fill_color="black", back_color="white")
+                buffer = io.BytesIO()
+                img.save(buffer, format="PNG")
+                buffer.seek(0)
+                qr_image_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+            next_in_waitlist.status = "registered"
+            next_in_waitlist.waitlist_position = None
+            next_in_waitlist.qr_code_token = qr_token
+            next_in_waitlist.registered_at = datetime.utcnow()
+
+            db.flush()
+            # Reordonezi restul din waitlist
+            remaining = db.query(models.EventRegistration).filter(
+                models.EventRegistration.event_id == event_id,
+                models.EventRegistration.status == "waitlist"  # ← nu îl mai include pe cel promovat
+            ).order_by(models.EventRegistration.waitlist_position).all()
+
+            for i, reg in enumerate(remaining):
+                reg.waitlist_position = i + 1
+
+            db.commit()
+
+            promoted_user = db.query(models.User).filter(
+                models.User.id == next_in_waitlist.user_id
+            ).first()
+
+            send_promoted_from_waitlist_email(
+                to_email=promoted_user.email,
+                user_name=promoted_user.full_name,
+                event_title=event.title,
+                event_date=str(event.start_datetime),
+                event_location=event.location or "—",
+                qr_image_base64=qr_image_base64
+            )
+            return {"message": "Te-ai dezînscris cu succes!"}
 
     db.commit()
-
-    return {"message": "Te-ai deziscris cu succes"}
+    return {"message": "Te-ai dezînscris cu succes!"}
 
 # POST feedback event
 @router.post("/{event_id}/feedback")
@@ -294,13 +404,21 @@ def get_my_event_ids(db: Session = Depends(get_db),user=Depends(get_current_user
     return [r.event_id for r in registrations]
 
 @router.get("/{event_id}/is-registered")
-def is_registered(event_id: int,db: Session = Depends(get_db),user=Depends(get_current_user)):
+def is_registered(event_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
     user_id = user["user_id"]
-    exists = db.query(models.EventRegistration).filter(
+    registration = db.query(models.EventRegistration).filter(
         models.EventRegistration.user_id == user_id,
         models.EventRegistration.event_id == event_id
     ).first()
-    return {"registered": exists is not None}
+
+    if not registration:
+        return {"registered": False, "status": "", "waitlist_position": None}
+
+    return {
+        "registered": True,
+        "status": registration.status,                        # "registered" sau "waitlist"
+        "waitlist_position": registration.waitlist_position   # numărul poziției sau None
+    }
 
 
 # GET qr-code al userului pentru un event
@@ -444,7 +562,37 @@ def delete_material(event_id: int, material_id: int, db: Session = Depends(get_d
     db.commit()
     return {"message": "Material șters!"}
 
+#Functie de preluare sentiment pe baza de feddBack
+def get_sentiment(feedbacks) -> dict:
+    if not feedbacks:
+        return {"label": "Fără recenzii", "color": "neutral", "emoji": "⚪"}
 
+    avg = sum(f.rating for f in feedbacks) / len(feedbacks)
+
+    if avg >= 4.0:
+        return {"label": "Foarte pozitiv", "color": "positive", "emoji": "🟢"}
+    elif avg >= 3.0:
+        return {"label": "Mixt", "color": "mixed", "emoji": "🟡"}
+    elif avg >= 2.0:
+        return {"label": "Negativ", "color": "negative", "emoji": "🔴"}
+    else:
+        return {"label": "Foarte negativ", "color": "very_negative", "emoji": "⛔"}
+
+
+@router.get("/")
+def get_events(db: Session = Depends(get_db)):
+    events = db.query(models.Event).all()
+    result = []
+    for event in events:
+        sentiment = get_sentiment(event.feedbacks)
+        result.append({
+            # ... toate câmpurile existente ...
+            "sentiment": sentiment,
+            "avg_rating": round(sum(f.rating for f in event.feedbacks) / len(event.feedbacks),
+                                1) if event.feedbacks else None,
+            "feedback_count": len(event.feedbacks),
+        })
+    return result
 
 
 #HELPERS

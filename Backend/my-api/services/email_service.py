@@ -99,3 +99,99 @@ def send_registration_email(
         print(f"Email trimis către {to_email}")
     except Exception as e:
         print(f"Eroare email: {e}")
+
+def send_waitlist_email(to_email: str, user_name: str, event_title: str, position: int):
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = f"⏳ Lista de așteptare — {event_title}"
+    msg["From"] = MAIL_FROM
+    msg["To"] = to_email
+
+    html = f"""
+    <html><body style="font-family: Inter, sans-serif; background: #f7f9fb; padding: 40px 0;">
+        <div style="max-width:520px; margin:0 auto; background:white; border-radius:24px; overflow:hidden;">
+            <div style="background: linear-gradient(135deg, #f59e0b, #d97706); padding:40px 32px; text-align:center;">
+                <div style="font-size:48px;">⏳</div>
+                <h1 style="color:white; font-size:22px; margin:16px 0 8px;">Pe lista de așteptare</h1>
+                <p style="color:rgba(255,255,255,0.8); font-size:14px; margin:0;">Vei fi notificat când un loc devine disponibil</p>
+            </div>
+            <div style="padding:32px;">
+                <p style="color:#374151;">Salut <strong>{user_name}</strong>,</p>
+                <p style="color:#6b7280; line-height:1.6;">
+                    Evenimentul <strong>{event_title}</strong> este complet momentan.
+                    Ești pe lista de așteptare pe poziția:
+                </p>
+                <div style="text-align:center; margin:24px 0;">
+                    <span style="font-size:48px; font-weight:800; color:#f59e0b;">#{position}</span>
+                </div>
+                <p style="color:#6b7280; font-size:13px;">
+                    Dacă cineva se dezînscrie, vei fi promovat automat și vei primi un email de confirmare.
+                </p>
+            </div>
+        </div>
+    </body></html>
+    """
+    msg.attach(MIMEText(html, "html"))
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(MAIL_USERNAME, MAIL_PASSWORD)
+            server.sendmail(MAIL_FROM, to_email, msg.as_string())
+    except Exception as e:
+        print(f"Eroare email waitlist: {e}")
+
+
+def send_promoted_from_waitlist_email(to_email: str, user_name: str,event_title: str, event_date: str,event_location: str, qr_image_base64: str = None):
+    msg = MIMEMultipart("related")
+    msg["Subject"] = f"🎉 Loc disponibil! — {event_title}"
+    msg["From"] = MAIL_FROM
+    msg["To"] = to_email
+
+    qr_section = ""
+    if qr_image_base64:
+        qr_section = """
+        <div style="text-align:center; margin:24px 0;">
+            <p style="font-weight:600;">🎫 Biletul tău QR</p>
+            <img src="cid:qrcode" style="width:200px; height:200px; border-radius:12px;" />
+        </div>
+        """
+
+    html = f"""
+    <html><body style="font-family: Inter, sans-serif; background: #f7f9fb; padding: 40px 0;">
+        <div style="max-width:520px; margin:0 auto; background:white; border-radius:24px; overflow:hidden;">
+            <div style="background:linear-gradient(135deg, #22c55e, #16a34a); padding:40px 32px; text-align:center;">
+                <div style="font-size:48px;">🎉</div>
+                <h1 style="color:white; font-size:22px; margin:16px 0 8px;">Loc disponibil!</h1>
+                <p style="color:rgba(255,255,255,0.8); font-size:14px; margin:0;">Ești acum înregistrat oficial</p>
+            </div>
+            <div style="padding:32px;">
+                <p style="color:#374151;">Salut <strong>{user_name}</strong>,</p>
+                <p style="color:#6b7280; line-height:1.6;">
+                    Un loc s-a eliberat la <strong>{event_title}</strong> și tu ai fost promovat automat din lista de așteptare!
+                </p>
+                <div style="background:#f7f9fb; border-radius:16px; padding:20px; border-left:4px solid #22c55e;">
+                    <h2 style="color:#166534; font-size:18px; margin:0 0 12px;">{event_title}</h2>
+                    <p style="color:#6b7280; font-size:13px; margin:4px 0;">📅 {event_date}</p>
+                    <p style="color:#6b7280; font-size:13px; margin:4px 0;">📍 {event_location}</p>
+                </div>
+                {qr_section}
+            </div>
+        </div>
+    </body></html>
+    """
+
+    msg_alt = MIMEMultipart("alternative")
+    msg.attach(msg_alt)
+    msg_alt.attach(MIMEText(html, "html"))
+
+    if qr_image_base64:
+        qr_bytes = base64.b64decode(qr_image_base64)
+        qr_img = MIMEImage(qr_bytes, _subtype="png")
+        qr_img.add_header("Content-ID", "<qrcode>")
+        qr_img.add_header("Content-Disposition", "inline")
+        msg.attach(qr_img)
+
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(MAIL_USERNAME, MAIL_PASSWORD)
+            server.sendmail(MAIL_FROM, to_email, msg.as_string())
+    except Exception as e:
+        print(f"Eroare email promovat: {e}")
