@@ -1,4 +1,4 @@
-import { Component, Inject, NgZone, OnInit, PLATFORM_ID } from '@angular/core';
+import { Component, inject, Inject, NgZone, OnInit, PLATFORM_ID } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -7,6 +7,8 @@ import { SidebarComponent } from '../../layout/sidebar-component/sidebar-compone
 import { EventService } from '../../services/event-service';
 import { Html5Qrcode } from 'html5-qrcode';
 import { AuthService } from '../../services/auth';
+import { MatDialog } from '@angular/material/dialog';
+import { ParticipantsDialogComponent } from '../../Dialog/participants-dialog-component/participants-dialog-component';
 
 @Component({
   selector: 'app-event-detail-component',
@@ -41,6 +43,9 @@ export class EventDetailComponent implements OnInit {
   waitlistPosition: number = 0;
   eventIsFull: boolean = false;
 
+  showParticipantsDialog = false;
+  currentUserId = 0;
+
   constructor(
     private route: ActivatedRoute,
     private router: Router,
@@ -48,6 +53,9 @@ export class EventDetailComponent implements OnInit {
     @Inject(PLATFORM_ID) private platformId: Object,
     private authService: AuthService
   ) {}
+
+  private dialog = inject(MatDialog);
+
 
   ngOnInit(): void {
     this.userRole = this.authService.getUserRole();
@@ -361,5 +369,15 @@ export class EventDetailComponent implements OnInit {
     link.download = `${this.event.title.replace(/\s+/g, '_')}.ics`;
     link.click();
     URL.revokeObjectURL(url);
+  }
+  openParticipants(): void {
+    this.dialog.open(ParticipantsDialogComponent, {
+      width: '800px',
+      maxHeight: '85vh',
+      data: {
+        eventId: this.event!.id,
+        eventTitle: this.event!.title
+      }
+    });
   }
 }

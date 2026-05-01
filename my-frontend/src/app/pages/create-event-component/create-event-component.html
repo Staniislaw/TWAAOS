@@ -169,6 +169,23 @@
         <!-- Materials -->
         <section class="form-section">
           <h2>📁 Materiale</h2>
+
+          <!-- Materiale deja salvate în DB — vizibile doar în edit mode -->
+          <div class="existing-files" *ngIf="isEditMode && existingMaterials.length > 0">
+            <small class="existing-label">Fișiere existente</small>
+            <div class="file-list">
+              <div class="file-item" *ngFor="let material of existingMaterials; let i = index">
+                <span class="file-icon">{{ getFileIcon(material.file_type || ' ') }}</span>
+                <div class="file-info">
+                  <strong>{{ material.file_name }}</strong>
+                  <small>{{ getFileSize(material.file_size_kb) }}</small>
+                </div>
+                <button class="btn-remove" (click)="removeExistingMaterial(i)">✕</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Upload fișiere noi -->
           <div
             class="upload-zone"
             (dragover)="onFileDragOver($event)"
@@ -178,10 +195,14 @@
             <span class="upload-icon">☁️</span>
             <p>Trage fișierele aici sau <u>click să selectezi</u></p>
             <small>PDF, PPTX, DOCX, ZIP (Max 50MB)</small>
-            <input #fileInput type="file" hidden multiple accept=".pdf,.pptx,.docx,.zip" (change)="onFileSelect($event)" />
+            <input #fileInput type="file" hidden multiple
+              accept=".pdf,.pptx,.docx,.zip"
+              (change)="onFileSelect($event)" />
           </div>
 
-          <div class="file-list">
+          <!-- Fișiere noi selectate -->
+          <div class="file-list" *ngIf="uploadedFiles.length > 0">
+            <small class="existing-label">Fișiere noi</small>
             <div class="file-item" *ngFor="let file of uploadedFiles; let i = index">
               <span class="file-icon">{{ getFileIcon(file.type) }}</span>
               <div class="file-info">

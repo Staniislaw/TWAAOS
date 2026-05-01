@@ -158,4 +158,10 @@ export class EventService {
   deleteSponsor(eventId: number, sponsorId: number): Observable<any> {
     return this.http.delete(`${this.apiUrl}/${eventId}/sponsors/${sponsorId}`);
   }
+  getParticipants(eventId: number): Observable<any[]> {
+    return this.http.get<any[]>(
+      `${this.apiUrl}/${eventId}/participants`,
+      { headers: this.getHeaders() }
+    );
+  }
 }

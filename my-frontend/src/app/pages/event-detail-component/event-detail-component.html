@@ -61,13 +61,20 @@
           <h3>Înscrie-te acum!</h3>
           <p>Locuri limitate disponibile. Grăbește-te!</p>
 
-          <div class="registered-count">
+          <div class="registered-count"
+            [class.clickable]="event.organizer_id === currentUserId || userRole === 'organizer' || 'admin'"
+            (click)="event.organizer_id === currentUserId || userRole === 'organizer' || 'admin'? openParticipants() : null"
+          >
             <div class="avatars">
               <div class="avatar">S</div>
               <div class="avatar">M</div>
               <div class="avatar">A</div>
             </div>
             <span>+{{ (event.max_participants ?? 0) - 23 }} înregistrați</span>
+            <span class="view-list"
+              *ngIf="event.organizer_id === currentUserId || userRole === 'organizer'|| 'admin'">
+              👁 Vezi lista
+            </span>
           </div>
 
           <div class="tags-row">

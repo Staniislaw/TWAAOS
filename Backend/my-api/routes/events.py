@@ -155,12 +155,22 @@ def get_event(event_id: int, db: Session = Depends(get_db)):
         "organizer_id": event.organizer_id,
         "organizer_name": event.organizer.full_name if event.organizer else "Necunoscut",
         "sponsors": [
-            {"name": s.name, "logo_path": s.logo_path, "website_url": s.website_url}
+            {"id": s.id, "name": s.name, "logo_path": s.logo_path, "website_url": s.website_url}
             for s in event.sponsors
         ],
         "sentiment": sentiment,
         "avg_rating": round(sum(f.rating for f in event.feedbacks) / len(event.feedbacks), 1) if event.feedbacks else None,
         "feedback_count": len(event.feedbacks),
+        "materials": [
+            {
+                "id": m.id,
+                "file_name": m.file_name,
+                "file_type": m.file_type,
+                "file_size_kb": m.file_size_kb,
+                "file_path": m.file_path
+            }
+            for m in event.materials
+        ]
     }
 
 # POST new event
@@ -537,8 +547,9 @@ def verify_qr(event_id: int, body: dict, db: Session = Depends(get_db), user=Dep
     if registration.status == "attended":
         raise HTTPException(status_code=400, detail="QR deja folosit!")
 
-    # Marchezi ca prezent
     registration.status = "attended"
+    registration.checked_in = True
+    registration.checked_in_at = datetime.utcnow()
     db.commit()
 
     return {"valid": True, "message": "Intrare confirmată!"}
@@ -662,7 +673,35 @@ def get_events(db: Session = Depends(get_db)):
         })
     return result
 
+#get toti participantio la evenimentul x.
+@router.get("/{event_id}/participants")
+def get_participants(event_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    event = db.query(models.Event).filter(models.Event.id == event_id).first()
+    if not event:
+        raise HTTPException(status_code=404, detail="Evenimentul nu există")
 
+    # Doar organizatorul sau admin poate vedea lista
+    if event.organizer_id != user["user_id"] and user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Acces interzis!")
+
+    registrations = db.query(models.EventRegistration).filter(
+        models.EventRegistration.event_id == event_id
+    ).all()
+
+    return [
+        {
+            "id": r.id,
+            "user_id": r.user_id,
+            "full_name": r.user.full_name,
+            "email": r.user.email,
+            "status": r.status,
+            "waitlist_position": r.waitlist_position,
+            "registered_at": str(r.registered_at),
+            "checked_in": r.checked_in,
+            "checked_in_at": str(r.checked_in_at) if r.checked_in_at else None,
+        }
+        for r in registrations
+    ]
 #HELPERS
 def sanitize_filename(filename: str) -> str:
     # Păstrezi extensia

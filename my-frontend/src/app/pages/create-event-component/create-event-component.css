@@ -306,6 +306,16 @@
   padding: 0.75rem;
   border-radius: 10px;
   border: 1px solid #e5e7eb;
+  overflow: hidden;
+}
+
+.sponsor-logo-img {
+  width: 40px;      
+  height: 40px;
+  object-fit: contain;
+  border-radius: 6px;
+  border: 1px solid #eee;
+  flex-shrink: 0;   
 }
 
 .sponsor-logo-mini {
@@ -530,4 +540,16 @@
   padding: 1.25rem 1.75rem;
   border-top: 1px solid #f3f4f6;
   background: #fafafa;
+}
+.existing-files {
+  margin-bottom: 1rem;
+}
+
+.existing-label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #9ca3af;
+  letter-spacing: 0.1em;
+  margin-bottom: 0.5rem;
 }

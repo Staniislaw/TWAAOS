@@ -2,7 +2,7 @@ import { Component } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Event } from '../../models/event.model';
+import { Event, EventMaterial } from '../../models/event.model';
 import { SidebarComponent } from '../../layout/sidebar-component/sidebar-component';
 import { EventService } from '../../services/event-service';
 
@@ -53,6 +53,13 @@ export class CreateEventComponent {
 
   isEditMode = false;
   editEventId: number | null = null;
+  existingMaterials: EventMaterial[] = [];
+  materialsToDelete: number[] = [];
+
+  sponsorsToDelete: number[] = [];
+  newSponsors: { name: string, logo_url: string, website_url: string }[] = [];
+
+
 
   constructor(
     private router: Router,
@@ -66,15 +73,21 @@ export class CreateEventComponent {
       this.editEventId = +id;
       this.eventService.getEventById(+id).subscribe({
         next: (event) => {
-
           this.eventForm = {
             ...event,
             start_datetime: this.toDatetimeLocal(event.start_datetime),
             end_datetime: event.end_datetime ? this.toDatetimeLocal(event.end_datetime) : '',
-            registration_deadline: event.registration_deadline ? event.registration_deadline.split('T')[0].split(' ')[0] : '',
+            registration_deadline: event.registration_deadline
+              ? event.registration_deadline.split('T')[0].split(' ')[0] : '',
           };
           this.activeMode = event.participation_mode || 'In-Person';
-          this.sponsors = event.sponsors || [];
+          this.sponsors = (event.sponsors || []).map((s: any) => ({
+            id: s.id,       
+            name: s.name,
+            logo_url: s.logo_path,
+            website_url: s.website_url
+          }));
+          this.existingMaterials = event.materials || [];
         }
       });
     }
@@ -99,6 +112,10 @@ export class CreateEventComponent {
   getFileIcon(type: string): string {
     const map: any = { 'pdf': '📄', 'docx': '📝', 'pptx': '📊', 'xlsx': '📈' };
     return map[type] || '📁';
+  }
+  getFileSize(kb: number | undefined): string {
+   if (!kb) return '—';
+     return kb >= 1000 ? (kb / 1024).toFixed(1) + ' MB' : kb + ' KB';
   }
 
   calculateDuration(): string {
@@ -151,39 +168,67 @@ export class CreateEventComponent {
       return;
     }
     this.isPublishing = true;
-    const call = this.isEditMode && this.editEventId
-      ? this.eventService.updateEvent(this.editEventId, { ...this.eventForm, status: 'active' })
-      : this.eventService.createEvent({ ...this.eventForm, status: 'active' });
-    call.subscribe({
-      next: (response) => {
-        const id = this.isEditMode ? this.editEventId! : response.id;
-        this.uploadExtras(id, () => {
+
+    if (this.isEditMode && this.editEventId) {
+      // UPDATE
+      this.eventService.updateEvent(this.editEventId, this.eventForm).subscribe({
+        next: async (response) => {
+          // Ștergi materialele marcate
+          for (const materialId of this.materialsToDelete) {
+            await this.eventService.deleteMaterial(this.editEventId!, materialId).toPromise();
+          }
+          for (const sponsorId of this.sponsorsToDelete) {
+            await this.eventService.deleteSponsor(this.editEventId!, sponsorId).toPromise();
+          }
+          const newSponsors = this.sponsors.filter(s => !s.id);
+          for (const sponsor of newSponsors) {
+            await this.eventService.addSponsor(this.editEventId!, sponsor).toPromise();
+          }
+
+          // Uploadezi materialele noi
+          if (this.uploadedFiles.length > 0) {
+            const files = this.uploadedFiles.map(f => f.file);
+            await this.eventService.uploadMaterials(this.editEventId!, files).toPromise();
+          }
           this.isPublishing = false;
           this.router.navigate(['/events']);
-        });
-      },
-      error: () => {
-        this.isPublishing = false;
-        this.errorMessage = 'Eroare la publicare!';
-      }
-    });
+        },
+        error: () => {
+          this.isPublishing = false;
+          this.errorMessage = 'Eroare la salvare!';
+        }
+      });
+    } else {
+      this.eventService.createEvent({ ...this.eventForm, status: 'active' }).subscribe({
+        next: (response) => {
+          this.uploadExtras(response.id, () => {
+            this.isPublishing = false;
+            this.router.navigate(['/events']);
+          });
+        },
+        error: () => {
+          this.isPublishing = false;
+          this.errorMessage = 'Eroare la publicare!';
+        }
+      });
+    }
   }
 
-
   uploadExtras(eventId: number, onDone: () => void): void {
-    const sponsorCalls = this.sponsors.map(s =>
+    const sponsorsToAdd = this.isEditMode
+      ? this.sponsors.filter(s => !s.id)
+      : this.sponsors;
+
+    const sponsorCalls = sponsorsToAdd.map(s =>
       this.eventService.addSponsor(eventId, s).toPromise()
     );
 
-    const allCalls = [...sponsorCalls];
-
-    Promise.all(allCalls).then(() => {
-      // Fișierele le trimitem separat dacă există
+    Promise.all(sponsorCalls).then(() => {
       if (this.uploadedFiles.length > 0) {
         const files = this.uploadedFiles.map(f => f.file);
         this.eventService.uploadMaterials(eventId, files).subscribe({
           next: () => onDone(),
-          error: () => onDone() // continuăm chiar dacă fișierele pică
+          error: () => onDone()
         });
       } else {
         onDone();
@@ -258,9 +303,18 @@ export class CreateEventComponent {
   }
 
   removeSponsor(index: number): void {
+    const sponsor = this.sponsors[index];
+    if (sponsor.id) {
+      this.sponsorsToDelete.push(sponsor.id);
+    }
     this.sponsors.splice(index, 1);
   }
   onLogoError(): void {
     this.sponsorPreviewError = true;
+  }
+  removeExistingMaterial(index: number): void {
+    const material = this.existingMaterials[index];
+    this.materialsToDelete.push(material.id);   
+    this.existingMaterials.splice(index, 1);      
   }
 }
