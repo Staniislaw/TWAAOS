@@ -91,6 +91,43 @@ def get_events(db: Session = Depends(get_db)):
         })
     return result
 
+# get created events by user.
+@router.get("/my/created")
+def get_my_created_events(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    user_id = user["user_id"]
+    events = db.query(models.Event).filter(models.Event.organizer_id == user_id).all()
+    result = []
+    for event in events:
+        sentiment = get_sentiment(event.feedbacks)
+        result.append({
+            "id": event.id,
+            "title": event.title,
+            "description": event.description,
+            "category": event.category,
+            "faculty": event.faculty,
+            "start_datetime": str(event.start_datetime) if event.start_datetime else None,
+            "end_datetime": str(event.end_datetime) if event.end_datetime else None,
+            "location": event.location,
+            "participation_mode": event.participation_mode,
+            "status": event.status,
+            "entry_type": event.entry_type,
+            "max_participants": event.max_participants,
+            "registration_deadline": str(event.registration_deadline) if event.registration_deadline else None,
+            "registration_link": event.registration_link,
+            "created_at": str(event.created_at),
+            "updated_at": str(event.updated_at),
+            "organizer_id": event.organizer_id,
+            "organizer_name": event.organizer.full_name if event.organizer else "Necunoscut",
+            "sponsors": [
+                {"name": s.name, "logo_path": s.logo_path, "website_url": s.website_url}
+                for s in event.sponsors
+            ],
+            "sentiment": sentiment,
+            "avg_rating": round(sum(f.rating for f in event.feedbacks) / len(event.feedbacks), 1) if event.feedbacks else None,
+            "feedback_count": len(event.feedbacks),
+        })
+    return result
+
 # GET events by ID with feedBacks sentiments
 @router.get("/{event_id}")
 def get_event(event_id: int, db: Session = Depends(get_db)):
@@ -101,16 +138,34 @@ def get_event(event_id: int, db: Session = Depends(get_db)):
     return {
         "id": event.id,
         "title": event.title,
-        # ... toate câmpurile existente ...
+        "description": event.description,
+        "category": event.category,
+        "faculty": event.faculty,
+        "start_datetime": str(event.start_datetime) if event.start_datetime else None,
+        "end_datetime": str(event.end_datetime) if event.end_datetime else None,
+        "location": event.location,
+        "participation_mode": event.participation_mode,
+        "status": event.status,
+        "entry_type": event.entry_type,
+        "max_participants": event.max_participants,
+        "registration_deadline": str(event.registration_deadline) if event.registration_deadline else None,
+        "registration_link": event.registration_link,
+        "created_at": str(event.created_at),
+        "updated_at": str(event.updated_at),
+        "organizer_id": event.organizer_id,
+        "organizer_name": event.organizer.full_name if event.organizer else "Necunoscut",
+        "sponsors": [
+            {"name": s.name, "logo_path": s.logo_path, "website_url": s.website_url}
+            for s in event.sponsors
+        ],
         "sentiment": sentiment,
-        "avg_rating": round(sum(f.rating for f in event.feedbacks) / len(event.feedbacks),
-                            1) if event.feedbacks else None,
+        "avg_rating": round(sum(f.rating for f in event.feedbacks) / len(event.feedbacks), 1) if event.feedbacks else None,
         "feedback_count": len(event.feedbacks),
     }
 
 # POST new event
 @router.post("/")
-def create_event(event_data: EventCreate, db: Session = Depends(get_db)):
+def create_event(event_data: EventCreate, db: Session = Depends(get_db),user=Depends(get_current_user)):
     try:
         new_event = models.Event(
             title=event_data.title,
@@ -126,7 +181,7 @@ def create_event(event_data: EventCreate, db: Session = Depends(get_db)):
             max_participants=event_data.max_participants,
             status=event_data.status,
             registration_link=event_data.registration_link,
-            organizer_id=1  # temporar, ulterior din JWT
+            organizer_id=user["user_id"]  # temporar, ulterior din JWT
         )
         db.add(new_event)
         db.commit()
@@ -138,10 +193,14 @@ def create_event(event_data: EventCreate, db: Session = Depends(get_db)):
 
 # PUT update event
 @router.put("/{event_id}")
-def update_event(event_id: int, event_data: EventCreate, db: Session = Depends(get_db)):
+def update_event(event_id: int, event_data: EventCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
     event = db.query(models.Event).filter(models.Event.id == event_id).first()
     if not event:
         raise HTTPException(status_code=404, detail="Evenimentul nu a fost găsit")
+
+    # doar organizatorul sau adminul poate edita
+    if event.organizer_id != user["user_id"] and user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Nu ai permisiunea să editezi acest eveniment")
 
     event.title = event_data.title
     event.description = event_data.description
@@ -151,6 +210,13 @@ def update_event(event_id: int, event_data: EventCreate, db: Session = Depends(g
     event.participation_mode = event_data.participation_mode
     event.max_participants = event_data.max_participants
     event.status = event_data.status
+    event.entry_type = event_data.entry_type
+    event.registration_link = event_data.registration_link
+    event.start_datetime = datetime.fromisoformat(
+    event_data.start_datetime) if event_data.start_datetime else event.start_datetime
+    event.end_datetime = datetime.fromisoformat(event_data.end_datetime) if event_data.end_datetime else None
+    event.registration_deadline = datetime.fromisoformat(
+    event_data.registration_deadline) if event_data.registration_deadline else None
     event.updated_at = datetime.utcnow()
 
     db.commit()
@@ -159,13 +225,15 @@ def update_event(event_id: int, event_data: EventCreate, db: Session = Depends(g
 
 # DELETE event
 @router.delete("/{event_id}")
-def delete_event(event_id: int, db: Session = Depends(get_db)):
+def delete_event(event_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
     event = db.query(models.Event).filter(models.Event.id == event_id).first()
     if not event:
-        raise HTTPException(status_code=404, detail="Evenimentul nu a fost găsit")
+        raise HTTPException(status_code=404, detail="Eveniment negăsit")
+    if event.organizer_id != user["user_id"]:
+        raise HTTPException(status_code=403, detail="Nu ai permisiunea să ștergi acest eveniment")
     db.delete(event)
     db.commit()
-    return {"message": "Eveniment șters!"}
+    return {"message": "Eveniment șters"}
 
 
 

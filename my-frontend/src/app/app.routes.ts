@@ -31,7 +31,11 @@ export const routes: Routes = [
     canActivate: [AuthGuard],
     data: { roles: ['organizer','admin'] } 
   },
-
+  { 
+    path: 'events/:id/edit', component: CreateEventComponent ,
+    canActivate: [AuthGuard],
+    data: { roles: ['organizer','admin'] }
+  },
   {
     path: 'events/:id',
     component: EventDetailComponent,

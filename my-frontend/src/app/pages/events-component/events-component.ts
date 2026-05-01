@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { Event } from '../../models/event.model';
 import { SidebarComponent } from '../../layout/sidebar-component/sidebar-component';
 import { EventService } from '../../services/event-service';
+import { AuthService } from '../../services/auth';
 
 @Component({
   selector: 'app-events-component',
@@ -45,13 +46,28 @@ export class EventsComponent implements OnInit {
 
   sortOrder: 'newest' | 'oldest' = 'newest'; 
 
+  showMyEvents = false;
+  isOrganizer = false;
+
+  currentUserId: number | null = null;
+  showDeleteConfirm = false;
+  deleteTargetId: number | null = null;
+
+
   constructor(
     private router: Router,
-    private eventService: EventService
+    private eventService: EventService,
+    private authService:AuthService,
   ) {}
 
   ngOnInit(): void {
+    this.currentUserId = this.authService.getUserId();
+    this.checkRole();
     this.loadEvents();
+  }
+  checkRole(): void {
+    const role = this.authService.getUserRole();
+    this.isOrganizer = role === 'organizer' || role === 'admin';
   }
 
   loadEvents(): void {
@@ -76,6 +92,24 @@ export class EventsComponent implements OnInit {
         this.isLoading = false;
       }
     });
+  }
+  toggleMyEvents(): void {
+    this.showMyEvents = !this.showMyEvents;
+    this.currentPage = 1;
+
+    if (this.showMyEvents) {
+      this.isLoading = true;
+      this.eventService.getMyCreatedEvents().subscribe({
+        next: (data) => {
+          this.filteredEvents = data;
+          this.isLoading = false;
+        },
+        error: () => this.isLoading = false
+      });
+    } else {
+      // Revii la toate evenimentele
+      this.applyFilters();
+    }
   }
   isRegistered(eventId: number): boolean {
     return this.registeredEventIds.has(eventId);
@@ -191,6 +225,7 @@ export class EventsComponent implements OnInit {
 
   // Filtrare evenimente
   applyFilters(): void {
+    if (this.showMyEvents) return; 
     this.currentPage = 1; 
     let filtered = this.events.filter(event => {
       // Categorie
@@ -227,6 +262,7 @@ export class EventsComponent implements OnInit {
   }
 
   resetFilters(): void {
+    this.showMyEvents = false;
     this.currentPage = 1;
     this.selectedCategory = '';
     this.selectedFaculty = '';
@@ -260,5 +296,37 @@ export class EventsComponent implements OnInit {
   goToPage(page: number): void {
     if (page < 1 || page > this.totalPages) return;
     this.currentPage = page;
+  }
+  isMyEvent(event: any): boolean {
+    return this.currentUserId !== null && event.organizer_id === this.currentUserId;
+  }
+
+  editEvent(id: number): void {
+    this.router.navigate(['/events', id, 'edit']);
+  }
+  deleteEvent(id: number): void {
+    this.deleteTargetId = id;
+    this.showDeleteConfirm = true;
+  }
+
+  cancelDelete(): void {
+    this.showDeleteConfirm = false;
+    this.deleteTargetId = null;
+  }
+
+  confirmDelete(): void {
+    if (!this.deleteTargetId) return;
+    this.eventService.deleteEvent(this.deleteTargetId).subscribe({
+      next: () => {
+        this.events = this.events.filter(e => e.id !== this.deleteTargetId);
+        this.filteredEvents = this.filteredEvents.filter(e => e.id !== this.deleteTargetId);
+        this.showDeleteConfirm = false;
+        this.deleteTargetId = null;
+      },
+      error: () => {
+        this.showDeleteConfirm = false;
+        alert('Eroare la ștergere!');
+      }
+    });
   }
 }

@@ -10,7 +10,7 @@
     <div class="page-header">
       <div>
         <button class="back-btn" (click)="cancel()">← Înapoi la evenimente</button>
-        <h1>Creează eveniment nou</h1>
+        <h1>{{ isEditMode ? 'Editează eveniment' : 'Creează eveniment nou' }}</h1>
         <p>Definește evenimentul academic cu precizie și stil.</p>
       </div>
       <div class="autosave" *ngIf="savedMessage">
@@ -232,11 +232,11 @@
     </div>
     <div class="footer-actions">
       <button class="btn-cancel" (click)="cancel()">Anulează</button>
-      <button class="btn-draft" (click)="saveDraft()" [disabled]="isSaving">
+      <button class="btn-draft" (click)="saveDraft()" [disabled]="isSaving" *ngIf="!isEditMode">
         {{ isSaving ? 'Se salvează...' : 'Salvează draft' }}
       </button>
-      <button class="btn-publish" (click)="publish()" [disabled]="isPublishing">
-        {{ isPublishing ? 'Se publică...' : '🚀 Publică evenimentul' }}
+     <button class="btn-publish" (click)="publish()" [disabled]="isPublishing">
+        {{ isPublishing ? 'Se salvează...' : (isEditMode ? '💾 Salvează modificările' : '🚀 Publică evenimentul') }}
       </button>
     </div>
   </footer>

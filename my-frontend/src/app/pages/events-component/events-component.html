@@ -11,9 +11,19 @@
       <div>
         <h1>Academic <span class="highlight">Events Explorer</span></h1>
       </div>
-      <button class="btn-secondary" (click)="toggleSort()">
-        {{ sortOrder === 'newest' ? '↕ Recent adăugate' : '↕ Cele mai vechi' }}
-      </button>
+      <div class="header-actions">
+        <button
+          class="btn-my-events"
+          *ngIf="isOrganizer"
+          [class.active]="showMyEvents"
+          (click)="toggleMyEvents()"
+        >
+          📋 {{ showMyEvents ? 'Toate evenimentele' : 'Evenimentele mele' }}
+        </button>
+        <button class="btn-secondary" (click)="toggleSort()">
+          {{ sortOrder === 'newest' ? '↕ Recent adăugate' : '↕ Cele mai vechi' }}
+        </button>
+      </div>
     </div>
 
     <!-- Filters -->
@@ -167,23 +177,28 @@
           </div>
 
           <div class="card-actions">
-           <button
-              class="btn-register"
-              [class.registered]="isRegistered(event.id)"
-              [disabled]="isRegistered(event.id)"
-               (click)="register(event.id); $event.stopPropagation()"
-            >
-              {{ isRegistered(event.id) ? 'Deja înscris' : 'Înregistrează-te' }}
-            </button>
+            <ng-container *ngIf="isMyEvent(event)">
+              <button class="btn-edit" (click)="editEvent(event.id); $event.stopPropagation()">✏️ Editează</button>
+              <button class="btn-delete" (click)="deleteEvent(event.id); $event.stopPropagation()">🗑️ Șterge</button>
+            </ng-container>
+            <ng-container *ngIf="!isMyEvent(event)">
+              <button
+                class="btn-register"
+                [class.registered]="isRegistered(event.id)"
+                [disabled]="isRegistered(event.id)"
+                (click)="register(event.id); $event.stopPropagation()"
+              >
+                {{ isRegistered(event.id) ? 'Deja înscris' : 'Înregistrează-te' }}
+              </button>
+            </ng-container>
+
             <button class="btn-details" (click)="goToEvent(event.id); $event.stopPropagation()">Vezi detalii</button>
           </div>
         </div>
       </div>
       <div class="no-results" *ngIf="!isLoading && filteredEvents.length === 0">
         <p>Niciun eveniment gasit pentru filtrele selectate.</p>
-        <button class="btn-secondary" (click)="resetFilters()">Reset filtre</button>
       </div>
-
     </div>
 
     <!-- Pagination -->
@@ -205,5 +220,18 @@
     <img [src]="qrCodeImage" alt="QR Code" />
     <small>Token: {{ qrToken }}</small>
     <button (click)="closeQrModal()">Închide</button>
+  </div>
+</div>
+
+<!-- Modal confirmare stergere -->
+<div class="confirm-overlay" *ngIf="showDeleteConfirm" (click)="cancelDelete()">
+  <div class="confirm-dialog" (click)="$event.stopPropagation()">
+    <div class="confirm-icon">🗑️</div>
+    <h3>Ștergi evenimentul?</h3>
+    <p>Această acțiune este ireversibilă. Evenimentul și toate datele asociate vor fi șterse permanent.</p>
+    <div class="confirm-actions">
+      <button class="btn-cancel" (click)="cancelDelete()">Anulează</button>
+      <button class="btn-confirm-delete" (click)="confirmDelete()">Da, șterge</button>
+    </div>
   </div>
 </div>

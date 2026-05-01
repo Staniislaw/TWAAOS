@@ -1,5 +1,5 @@
 import { Component } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Event } from '../../models/event.model';
@@ -51,12 +51,38 @@ export class CreateEventComponent {
   sponsorPreviewError = false;
   createdEventId: number | null = null;
 
-
+  isEditMode = false;
+  editEventId: number | null = null;
 
   constructor(
     private router: Router,
+    private route: ActivatedRoute,
     private eventService: EventService  
   ) {}
+  ngOnInit(): void {
+    const id = this.route.snapshot.paramMap.get('id');
+    if (id) {
+      this.isEditMode = true;
+      this.editEventId = +id;
+      this.eventService.getEventById(+id).subscribe({
+        next: (event) => {
+
+          this.eventForm = {
+            ...event,
+            start_datetime: this.toDatetimeLocal(event.start_datetime),
+            end_datetime: event.end_datetime ? this.toDatetimeLocal(event.end_datetime) : '',
+            registration_deadline: event.registration_deadline ? event.registration_deadline.split('T')[0].split(' ')[0] : '',
+          };
+          this.activeMode = event.participation_mode || 'In-Person';
+          this.sponsors = event.sponsors || [];
+        }
+      });
+    }
+  }
+  toDatetimeLocal(dateStr: string): string {
+    if (!dateStr) return '';
+    return dateStr.replace(' ', 'T').substring(0, 16);
+  }
 
   setMode(mode: string): void {
     this.activeMode = mode;
@@ -97,10 +123,14 @@ export class CreateEventComponent {
     }
     this.isSaving = true;
 
-    this.eventService.createEvent({ ...this.eventForm, status: 'draft' }).subscribe({
+    const call = this.isEditMode && this.editEventId
+      ? this.eventService.updateEvent(this.editEventId, { ...this.eventForm, status: 'draft' })
+      : this.eventService.createEvent({ ...this.eventForm, status: 'draft' });
+
+    call.subscribe({
       next: (response) => {
-        this.createdEventId = response.id;
-        this.uploadExtras(response.id, () => {
+        const id = this.isEditMode ? this.editEventId! : response.id;
+        this.uploadExtras(id, () => {
           this.isSaving = false;
           this.savedMessage = 'Draft salvat!';
           setTimeout(() => this.savedMessage = '', 3000);
@@ -121,11 +151,13 @@ export class CreateEventComponent {
       return;
     }
     this.isPublishing = true;
-
-    this.eventService.createEvent({ ...this.eventForm, status: 'active' }).subscribe({
+    const call = this.isEditMode && this.editEventId
+      ? this.eventService.updateEvent(this.editEventId, { ...this.eventForm, status: 'active' })
+      : this.eventService.createEvent({ ...this.eventForm, status: 'active' });
+    call.subscribe({
       next: (response) => {
-        this.createdEventId = response.id;
-        this.uploadExtras(response.id, () => {
+        const id = this.isEditMode ? this.editEventId! : response.id;
+        this.uploadExtras(id, () => {
           this.isPublishing = false;
           this.router.navigate(['/events']);
         });
@@ -136,6 +168,7 @@ export class CreateEventComponent {
       }
     });
   }
+
 
   uploadExtras(eventId: number, onDone: () => void): void {
     const sponsorCalls = this.sponsors.map(s =>

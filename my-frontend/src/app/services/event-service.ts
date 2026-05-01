@@ -30,6 +30,12 @@ export class EventService {
     });
   }
 
+  getMyCreatedEvents(): Observable<any[]> {
+    return this.http.get<Event[]>(
+      `${this.apiUrl}/my/created`,
+      { headers: this.getHeaders() }
+    );
+  }
   // GET eveniment dupa ID
   getEventById(id: number): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/${id}`, {
@@ -152,6 +158,4 @@ export class EventService {
   deleteSponsor(eventId: number, sponsorId: number): Observable<any> {
     return this.http.delete(`${this.apiUrl}/${eventId}/sponsors/${sponsorId}`);
   }
-
- 
 }

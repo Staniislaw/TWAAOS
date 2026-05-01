@@ -42,12 +42,15 @@ export class AuthService {
     return null;
   }
   getUserRole(): string | null {
-    const token = localStorage.getItem('access_token');
+    try {
+      const token = localStorage.getItem('access_token');
+      if (!token) return null;
 
-    if (!token) return null;
-
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    return payload.role;
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.role ?? null;
+    } catch {
+      return null;
+    }
   }
 
   isLoggedIn(): boolean {
@@ -60,6 +63,12 @@ export class AuthService {
       return user ? JSON.parse(user) : null;
     }
     return null;
+  }
+  getUserId(): number | null {
+    const token = localStorage.getItem('access_token');
+    if (!token) return null;
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.user_id ?? null;
   }
 
   logout(): void {
