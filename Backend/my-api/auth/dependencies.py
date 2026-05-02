@@ -14,5 +14,6 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
     return {
         "user_id": payload.get("user_id"),
         "email": payload.get("sub"),
-        "name": payload.get("name")
+        "name": payload.get("name"),
+        "role": payload.get("role")
     }

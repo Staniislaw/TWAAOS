@@ -113,7 +113,9 @@ def get_events(db: Session = Depends(get_db)):
             created_at, updated_at, organizer_id, organizer_name, sponsors,
             sentiment, avg_rating, feedback_count.
     """
-    events = db.query(models.Event).all()
+    events = db.query(models.Event).filter(
+        models.Event.status.notin_(["pending", "rejected"])
+    ).all()
     result = []
     for event in events:
         sentiment = get_sentiment(event.feedbacks)
@@ -183,6 +185,7 @@ def get_my_created_events(db: Session = Depends(get_db), user=Depends(get_curren
             "location": event.location,
             "participation_mode": event.participation_mode,
             "status": event.status,
+            "rejection_reason": event.rejection_reason,
             "entry_type": event.entry_type,
             "max_participants": event.max_participants,
             "registration_deadline": str(event.registration_deadline) if event.registration_deadline else None,
@@ -301,7 +304,7 @@ def create_event(event_data: EventCreate, db: Session = Depends(get_db), user=De
             participation_mode=event_data.participation_mode,
             entry_type=event_data.entry_type,
             max_participants=event_data.max_participants,
-            status=event_data.status,
+            status="pending",
             registration_link=event_data.registration_link,
             organizer_id=user["user_id"]
         )

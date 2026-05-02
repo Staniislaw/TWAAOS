@@ -643,3 +643,55 @@
 .btn-confirm-delete:hover {
   background: #dc2626;
 }
+/* Card rejected — border roșu */
+.event-card.card-rejected {
+  border: 2px solid #fca5a5;
+  background: #fff8f8;
+}
+
+.event-card.card-rejected .card-title {
+  color: #dc2626;
+}
+
+/* Card pending — border galben */
+.event-card.card-pending {
+  border: 2px solid #fde047;
+  background: #fffef0;
+}
+
+/* Banner rejected */
+.rejected-banner {
+  background: #fee2e2;
+  border: 1px solid #fca5a5;
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.rejected-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #dc2626;
+}
+
+.rejected-reason {
+  font-size: 0.78rem;
+  color: #991b1b;
+  line-height: 1.4;
+  font-style: italic;
+}
+
+/* Banner pending */
+.pending-banner {
+  background: #fef9c3;
+  border: 1px solid #fde047;
+  border-radius: 10px;
+  padding: 0.65rem 1rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #854d0e;
+  margin-bottom: 0.75rem;
+}

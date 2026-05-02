@@ -19,6 +19,7 @@ export class SidebarComponent {
     { label: 'Înregistrările mele', icon: '📋', route: '/my-registrations' },
     { label: 'Materiale', icon: '📁', route: '/materials' },
     { label: 'Feedback', icon: '⭐', route: '/feedback' },
+    { route: '/admin', icon: '⚙️', label: 'Admin', adminOnly: true }
   ]; 
 
   footerItems = [

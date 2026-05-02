@@ -6,6 +6,8 @@ import { EventDetailComponent } from './pages/event-detail-component/event-detai
 import { CreateEventComponent } from './pages/create-event-component/create-event-component';
 import { AuthCallbackComponent } from './pages/auth-callback-component/auth-callback-component';
 import { AuthGuard } from './Guard/guards/auth-guard';
+import { AdminComponent } from './pages/admin-component/admin-component';
+import { AdminGuard } from './Guard/AdminGuard';
 
 export const routes: Routes = [
   { path: '', redirectTo: 'login', pathMatch: 'full' },
@@ -41,6 +43,6 @@ export const routes: Routes = [
     component: EventDetailComponent,
     canActivate: [AuthGuard]
   },
-
+  { path: 'admin', component: AdminComponent, canActivate: [AdminGuard] },
   { path: '**', redirectTo: 'login' }
 ];

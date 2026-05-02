@@ -130,6 +130,8 @@
         class="event-card"
         *ngFor="let event of paginatedEvents; let i = index"
         [class.featured]="i === 3"
+        [class.card-rejected]="event.status === 'rejected'"
+        [class.card-pending]="event.status === 'pending'"
         (click)="goToEvent(event.id)">
         <!-- Card Cover -->
         <div class="card-cover">
@@ -154,13 +156,24 @@
           <h3 class="card-title">{{ event.title }}</h3>
           <p class="card-description">{{ event.description }}</p>
 
-          <div class="card-tags">
+          <div class="rejected-banner" *ngIf="event.status === 'rejected'">
+            <span class="rejected-label">❌ Respins</span>
+            <span class="rejected-reason">{{ event.rejection_reason }}</span>
+          </div>
+
+          <!-- Badge pending -->
+          <div class="pending-banner" *ngIf="event.status === 'pending'">
+            ⏳ În așteptarea aprobării
+          </div>
+
+          <div class="card-tags" *ngIf="event.status !== 'rejected' && event.status !== 'pending'">
             <span class="tag tag-faculty">{{ event.faculty }}</span>
             <span class="tag tag-mode">{{ event.participation_mode }}</span>
             <span class="tag" [ngClass]="getEntryTypeClass(event.entry_type)">
               {{ getEntryTypeLabel(event.entry_type) }}
             </span>
-            <span class="tag" [class.tag-open]="event.status === 'active'" [class.tag-closing]="event.status === 'closing_soon'">
+            <span class="tag" [class.tag-open]="event.status === 'active'"
+              [class.tag-closing]="event.status === 'closing_soon'">
               {{ getStatusLabel(event.status) }}
             </span>
           </div>

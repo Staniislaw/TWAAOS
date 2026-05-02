@@ -203,7 +203,8 @@ export class CreateEventComponent {
         next: (response) => {
           this.uploadExtras(response.id, () => {
             this.isPublishing = false;
-            this.router.navigate(['/events']);
+            this.savedMessage = 'Eveniment trimis! Așteaptă aprobarea adminului.';
+            setTimeout(() => this.router.navigate(['/events']), 2000);
           });
         },
         error: () => {

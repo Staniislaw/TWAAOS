@@ -11,16 +11,16 @@
 
   <!-- Nav principal -->
   <nav class="sidebar-nav">
-    
+    <ng-container *ngFor="let item of navItems"> 
     <a
-      *ngFor="let item of navItems"
+      *ngIf="!item['adminOnly'] || userRole === 'admin'"
       class="nav-item"
       [routerLink]="item.route"
       routerLinkActive="active"
     >
       <span class="nav-icon">{{ item.icon }}</span>
       <span>{{ item.label }}</span>
-    </a>
+    </a></ng-container>
 
     <!-- Buton Create Event -->
    <button *ngIf="userRole === 'organizer' || userRole === 'admin'" class="btn-create" routerLink="/events/create">

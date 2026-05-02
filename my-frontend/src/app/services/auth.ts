@@ -74,6 +74,8 @@ export class AuthService {
   logout(): void {
     if (this.isBrowser) {
       localStorage.removeItem('access_token');
+      localStorage.removeItem('jwt_token');
+      localStorage.removeItem('token');     
       localStorage.removeItem('user');
     }
     this.router.navigate(['/login']);

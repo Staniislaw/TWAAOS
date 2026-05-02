@@ -11,6 +11,7 @@ export interface Event {
   category?: string;
   faculty?: string;
   status: string;
+  rejection_reason?: string;
   entry_type : string;
   registration_link?: string;
   max_participants?: number;
