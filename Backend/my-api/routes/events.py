@@ -13,7 +13,7 @@ from DTO.SponsorsDTO import SponsorCreate
 
 from auth.dependencies import get_current_user
 
-from services.email_service import send_registration_email,send_promoted_from_waitlist_email,send_waitlist_email
+from services.email_service import send_registration_email, send_promoted_from_waitlist_email, send_waitlist_email
 
 import uuid
 import qrcode
@@ -22,7 +22,27 @@ import base64
 
 router = APIRouter(prefix="/events", tags=["Events"])
 
+
 class EventCreate(BaseModel):
+    """
+    Schema Pydantic pentru crearea sau actualizarea unui eveniment.
+
+    Attributes:
+        title (str): Titlul evenimentului. Camp obligatoriu.
+        description (str, optional): Descrierea detaliata a evenimentului.
+        category (str, optional): Categoria evenimentului (ex: conferinta, workshop, seminar).
+        faculty (str, optional): Facultatea sau departamentul organizator.
+        start_datetime (str): Data si ora de inceput in format ISO 8601 (ex: '2025-06-01T10:00:00').
+        end_datetime (str, optional): Data si ora de sfarsit in format ISO 8601.
+        registration_deadline (str, optional): Termenul limita pentru inscrieri in format ISO 8601.
+        location (str, optional): Locatia fizica a evenimentului.
+        participation_mode (str, optional): Modul de participare. Valori posibile: 'In-Person', 'Online', 'Hybrid'. Default: 'In-Person'.
+        entry_type (str, optional): Tipul de intrare. Valori posibile: 'free', 'qr_code'. Default: 'free'.
+        max_participants (int, optional): Numarul maxim de participanti admisi.
+        status (str, optional): Statusul evenimentului. Valori posibile: 'active', 'cancelled', 'completed'. Default: 'active'.
+        registration_link (str, optional): Link extern pentru inscriere.
+    """
+
     title: str
     description: Optional[str] = None
     category: Optional[str] = None
@@ -37,7 +57,26 @@ class EventCreate(BaseModel):
     status: Optional[str] = "active"
     registration_link: Optional[str] = None
 
+
 class EventResponse(BaseModel):
+    """
+    Schema Pydantic pentru raspunsul unui eveniment.
+
+    Attributes:
+        id (int): ID-ul unic al evenimentului.
+        title (str): Titlul evenimentului.
+        description (str, optional): Descrierea evenimentului.
+        category (str, optional): Categoria evenimentului.
+        faculty (str, optional): Facultatea organizatoare.
+        start_datetime (str): Data si ora de inceput.
+        end_datetime (str, optional): Data si ora de sfarsit.
+        location (str, optional): Locatia evenimentului.
+        participation_mode (str, optional): Modul de participare.
+        max_participants (int, optional): Numarul maxim de participanti.
+        status (str): Statusul curent al evenimentului.
+        created_at (str): Timestamp-ul crearii evenimentului.
+    """
+
     id: int
     title: str
     description: Optional[str]
@@ -54,9 +93,26 @@ class EventResponse(BaseModel):
     class Config:
         from_attributes = True
 
-# GET all events
+
 @router.get("/")
 def get_events(db: Session = Depends(get_db)):
+    """
+    Returneaza lista tuturor evenimentelor disponibile.
+
+    Pentru fiecare eveniment sunt incluse informatii despre organizator,
+    sponsori, sentiment agregat din feedback-uri si rating-ul mediu.
+
+    Args:
+        db (Session): Sesiunea bazei de date injectata prin dependency injection.
+
+    Returns:
+        list[dict]: Lista de dictionare cu datele complete ale evenimentelor,
+            inclusiv campurile: id, title, description, category, faculty,
+            start_datetime, end_datetime, location, participation_mode, status,
+            entry_type, max_participants, registration_deadline, registration_link,
+            created_at, updated_at, organizer_id, organizer_name, sponsors,
+            sentiment, avg_rating, feedback_count.
+    """
     events = db.query(models.Event).all()
     result = []
     for event in events:
@@ -91,9 +147,26 @@ def get_events(db: Session = Depends(get_db)):
         })
     return result
 
-# get created events by user.
+
 @router.get("/my/created")
 def get_my_created_events(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    """
+    Returneaza evenimentele create de utilizatorul autentificat curent.
+
+    Filtreaza evenimentele dupa organizer_id, extras din tokenul JWT.
+    Include aceleasi campuri ca GET /events/, dar doar pentru evenimentele
+    apartinand utilizatorului curent.
+
+    Args:
+        db (Session): Sesiunea bazei de date.
+        user (dict): Payload-ul JWT al utilizatorului curent, continand user_id si role.
+
+    Returns:
+        list[dict]: Lista evenimentelor create de utilizatorul curent.
+
+    Raises:
+        HTTPException 401: Daca tokenul JWT lipseste sau este invalid.
+    """
     user_id = user["user_id"]
     events = db.query(models.Event).filter(models.Event.organizer_id == user_id).all()
     result = []
@@ -123,14 +196,32 @@ def get_my_created_events(db: Session = Depends(get_db), user=Depends(get_curren
                 for s in event.sponsors
             ],
             "sentiment": sentiment,
-            "avg_rating": round(sum(f.rating for f in event.feedbacks) / len(event.feedbacks), 1) if event.feedbacks else None,
+            "avg_rating": round(sum(f.rating for f in event.feedbacks) / len(event.feedbacks),
+                                1) if event.feedbacks else None,
             "feedback_count": len(event.feedbacks),
         })
     return result
 
-# GET events by ID with feedBacks sentiments
+
 @router.get("/{event_id}")
 def get_event(event_id: int, db: Session = Depends(get_db)):
+    """
+    Returneaza detaliile complete ale unui eveniment dupa ID.
+
+    Include toate campurile evenimentului, plus lista de materiale atasate,
+    sponsori, sentiment si rating mediu calculat din feedback-uri.
+
+    Args:
+        event_id (int): ID-ul unic al evenimentului cautat.
+        db (Session): Sesiunea bazei de date.
+
+    Returns:
+        dict: Datele complete ale evenimentului, inclusiv campul 'materials'
+            cu fisierele atasate (id, file_name, file_type, file_size_kb, file_path).
+
+    Raises:
+        HTTPException 404: Daca evenimentul cu ID-ul specificat nu exista.
+    """
     event = db.query(models.Event).filter(models.Event.id == event_id).first()
     if not event:
         raise HTTPException(status_code=404, detail="Evenimentul nu a fost găsit")
@@ -159,7 +250,8 @@ def get_event(event_id: int, db: Session = Depends(get_db)):
             for s in event.sponsors
         ],
         "sentiment": sentiment,
-        "avg_rating": round(sum(f.rating for f in event.feedbacks) / len(event.feedbacks), 1) if event.feedbacks else None,
+        "avg_rating": round(sum(f.rating for f in event.feedbacks) / len(event.feedbacks),
+                            1) if event.feedbacks else None,
         "feedback_count": len(event.feedbacks),
         "materials": [
             {
@@ -173,9 +265,28 @@ def get_event(event_id: int, db: Session = Depends(get_db)):
         ]
     }
 
-# POST new event
+
 @router.post("/")
-def create_event(event_data: EventCreate, db: Session = Depends(get_db),user=Depends(get_current_user)):
+def create_event(event_data: EventCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    """
+    Creeaza un eveniment nou in baza de date.
+
+    Organizatorul este setat automat din tokenul JWT al utilizatorului autentificat.
+    Datele de tip datetime sunt convertite din format ISO 8601 string la obiecte datetime.
+
+    Args:
+        event_data (EventCreate): Datele evenimentului de creat.
+        db (Session): Sesiunea bazei de date.
+        user (dict): Payload-ul JWT, folosit pentru a extrage user_id-ul organizatorului.
+
+    Returns:
+        dict: Mesaj de confirmare si ID-ul evenimentului creat.
+            Exemplu: {"message": "Eveniment creat cu succes!", "id": 7}
+
+    Raises:
+        HTTPException 400: Daca datele sunt invalide sau apare o eroare la salvare.
+        HTTPException 401: Daca utilizatorul nu este autentificat.
+    """
     try:
         new_event = models.Event(
             title=event_data.title,
@@ -184,14 +295,15 @@ def create_event(event_data: EventCreate, db: Session = Depends(get_db),user=Dep
             faculty=event_data.faculty,
             start_datetime=datetime.fromisoformat(event_data.start_datetime),
             end_datetime=datetime.fromisoformat(event_data.end_datetime) if event_data.end_datetime else None,
-            registration_deadline=datetime.fromisoformat(event_data.registration_deadline) if event_data.registration_deadline else None,
+            registration_deadline=datetime.fromisoformat(
+                event_data.registration_deadline) if event_data.registration_deadline else None,
             location=event_data.location,
             participation_mode=event_data.participation_mode,
             entry_type=event_data.entry_type,
             max_participants=event_data.max_participants,
             status=event_data.status,
             registration_link=event_data.registration_link,
-            organizer_id=user["user_id"]  # temporar, ulterior din JWT
+            organizer_id=user["user_id"]
         )
         db.add(new_event)
         db.commit()
@@ -201,14 +313,35 @@ def create_event(event_data: EventCreate, db: Session = Depends(get_db),user=Dep
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
-# PUT update event
+
 @router.put("/{event_id}")
-def update_event(event_id: int, event_data: EventCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
+def update_event(event_id: int, event_data: EventCreate, db: Session = Depends(get_db),
+                 user=Depends(get_current_user)):
+    """
+    Actualizeaza datele unui eveniment existent.
+
+    Doar organizatorul evenimentului sau un utilizator cu rolul 'admin'
+    poate efectua modificari. Campul updated_at este actualizat automat.
+
+    Args:
+        event_id (int): ID-ul evenimentului de actualizat.
+        event_data (EventCreate): Noile date ale evenimentului.
+        db (Session): Sesiunea bazei de date.
+        user (dict): Payload-ul JWT al utilizatorului curent.
+
+    Returns:
+        dict: Mesaj de confirmare si ID-ul evenimentului actualizat.
+            Exemplu: {"message": "Eveniment actualizat!", "id": 7}
+
+    Raises:
+        HTTPException 404: Daca evenimentul nu exista.
+        HTTPException 403: Daca utilizatorul nu are permisiunea de a edita.
+        HTTPException 401: Daca utilizatorul nu este autentificat.
+    """
     event = db.query(models.Event).filter(models.Event.id == event_id).first()
     if not event:
         raise HTTPException(status_code=404, detail="Evenimentul nu a fost găsit")
 
-    # doar organizatorul sau adminul poate edita
     if event.organizer_id != user["user_id"] and user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Nu ai permisiunea să editezi acest eveniment")
 
@@ -223,19 +356,39 @@ def update_event(event_id: int, event_data: EventCreate, db: Session = Depends(g
     event.entry_type = event_data.entry_type
     event.registration_link = event_data.registration_link
     event.start_datetime = datetime.fromisoformat(
-    event_data.start_datetime) if event_data.start_datetime else event.start_datetime
+        event_data.start_datetime) if event_data.start_datetime else event.start_datetime
     event.end_datetime = datetime.fromisoformat(event_data.end_datetime) if event_data.end_datetime else None
     event.registration_deadline = datetime.fromisoformat(
-    event_data.registration_deadline) if event_data.registration_deadline else None
+        event_data.registration_deadline) if event_data.registration_deadline else None
     event.updated_at = datetime.utcnow()
 
     db.commit()
     db.refresh(event)
     return {"message": "Eveniment actualizat!", "id": event.id}
 
-# DELETE event
+
 @router.delete("/{event_id}")
 def delete_event(event_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    """
+    Sterge un eveniment din baza de date.
+
+    Doar organizatorul evenimentului poate efectua stergerea.
+    Adminii nu pot sterge evenimentele altora prin acest endpoint.
+
+    Args:
+        event_id (int): ID-ul evenimentului de sters.
+        db (Session): Sesiunea bazei de date.
+        user (dict): Payload-ul JWT al utilizatorului curent.
+
+    Returns:
+        dict: Mesaj de confirmare.
+            Exemplu: {"message": "Eveniment șters"}
+
+    Raises:
+        HTTPException 404: Daca evenimentul nu exista.
+        HTTPException 403: Daca utilizatorul nu este organizatorul evenimentului.
+        HTTPException 401: Daca utilizatorul nu este autentificat.
+    """
     event = db.query(models.Event).filter(models.Event.id == event_id).first()
     if not event:
         raise HTTPException(status_code=404, detail="Eveniment negăsit")
@@ -246,39 +399,109 @@ def delete_event(event_id: int, db: Session = Depends(get_db), user=Depends(get_
     return {"message": "Eveniment șters"}
 
 
-
-# GET materiale event
 @router.get("/{event_id}/materials")
 def get_event_materials(event_id: int, db: Session = Depends(get_db)):
+    """
+    Returneaza lista materialelor atasate unui eveniment.
+
+    Args:
+        event_id (int): ID-ul evenimentului.
+        db (Session): Sesiunea bazei de date.
+
+    Returns:
+        list[EventMaterial]: Lista obiectelor EventMaterial asociate evenimentului.
+    """
     return db.query(models.EventMaterial).filter(
         models.EventMaterial.event_id == event_id
     ).all()
 
-# GET feedback event
+
 @router.get("/{event_id}/feedback")
 def get_event_feedback(event_id: int, db: Session = Depends(get_db)):
+    """
+    Returneaza toate feedback-urile primite pentru un eveniment.
+
+    Args:
+        event_id (int): ID-ul evenimentului.
+        db (Session): Sesiunea bazei de date.
+
+    Returns:
+        list[EventFeedback]: Lista obiectelor EventFeedback asociate evenimentului.
+    """
     return db.query(models.EventFeedback).filter(
         models.EventFeedback.event_id == event_id
     ).all()
 
-# GET sponsori event
+
 @router.get("/{event_id}/sponsors")
 def get_event_sponsors(event_id: int, db: Session = Depends(get_db)):
+    """
+    Returneaza lista sponsorilor unui eveniment.
+
+    Args:
+        event_id (int): ID-ul evenimentului.
+        db (Session): Sesiunea bazei de date.
+
+    Returns:
+        list[EventSponsor]: Lista obiectelor EventSponsor asociate evenimentului.
+    """
     return db.query(models.EventSponsor).filter(
         models.EventSponsor.event_id == event_id
     ).all()
 
-# POST inregistrare la event
+
 @router.post("/{event_id}/register")
 def register_to_event(event_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    user_id = user["user_id"]  # din JWT, nu mai e hardcodat
+    """
+    Inscrie utilizatorul curent la un eveniment.
 
-    # 1. Verifici dacă evenimentul există
+    Logica de inscriere:
+        1. Verifica existenta evenimentului.
+        2. Verifica daca utilizatorul este deja inscris (registered sau waitlist).
+        3. Numara locurile ocupate (doar status 'registered').
+        4. Daca evenimentul este complet, adauga utilizatorul pe waitlist si trimite email.
+        5. Daca exista locuri, genereaza QR code (doar daca entry_type == 'qr_code').
+        6. Salveaza inregistrarea si trimite email de confirmare.
+
+    Args:
+        event_id (int): ID-ul evenimentului la care se face inscrierea.
+        db (Session): Sesiunea bazei de date.
+        user (dict): Payload-ul JWT al utilizatorului curent.
+
+    Returns:
+        dict: Statusul inscrierii. Daca evenimentul are entry_type 'qr_code',
+            raspunsul include si campurile 'qr_code' (base64 PNG) si 'qr_token' (UUID).
+
+    Raises:
+        HTTPException 404: Daca evenimentul nu exista.
+        HTTPException 400: Daca utilizatorul este deja inscris.
+        HTTPException 401: Daca utilizatorul nu este autentificat.
+
+    Example:
+        Raspuns pentru loc disponibil::
+
+            {
+                "message": "Înregistrat cu succes!",
+                "status": "registered",
+                "registration_id": 42,
+                "qr_code": "data:image/png;base64,...",
+                "qr_token": "550e8400-e29b-41d4-a716-446655440000"
+            }
+
+        Raspuns pentru waitlist::
+
+            {
+                "message": "Evenimentul e complet! Ești pe lista de așteptare pe poziția 3.",
+                "status": "waitlist",
+                "waitlist_position": 3
+            }
+    """
+    user_id = user["user_id"]
+
     event = db.query(models.Event).filter(models.Event.id == event_id).first()
     if not event:
         raise HTTPException(status_code=404, detail="Evenimentul nu există")
 
-    # 2. Verifici dacă userul e deja înregistrat
     existing = db.query(models.EventRegistration).filter(
         models.EventRegistration.event_id == event_id,
         models.EventRegistration.user_id == user_id,
@@ -287,17 +510,14 @@ def register_to_event(event_id: int, db: Session = Depends(get_db), user=Depends
     if existing:
         raise HTTPException(status_code=400, detail="Ești deja înregistrat la acest eveniment!")
 
-    # Numarare locurile ocupate (doar "registered", nu waitlist)
     registered_count = db.query(models.EventRegistration).filter(
         models.EventRegistration.event_id == event_id,
         models.EventRegistration.status == "registered"
     ).count()
 
-    # 3. Verifici dacă mai sunt locuri
     is_full = event.max_participants and registered_count >= event.max_participants
 
     if is_full:
-        # Calculezi poziția în waitlist
         waitlist_count = db.query(models.EventRegistration).filter(
             models.EventRegistration.event_id == event_id,
             models.EventRegistration.status == "waitlist"
@@ -313,7 +533,6 @@ def register_to_event(event_id: int, db: Session = Depends(get_db), user=Depends
         db.add(registration)
         db.commit()
 
-        # Trimite email waitlist
         db_user = db.query(models.User).filter(models.User.id == user_id).first()
         send_waitlist_email(
             to_email=db_user.email,
@@ -328,39 +547,31 @@ def register_to_event(event_id: int, db: Session = Depends(get_db), user=Depends
             "waitlist_position": waitlist_count + 1
         }
 
-    # 4. Generezi QR token DOAR dacă entry_type == "qr_code"
     qr_token = None
     qr_image_base64 = None
 
     if event.entry_type == "qr_code":
-        # Generezi tokenul unic
         qr_token = str(uuid.uuid4())
-
-        # Generezi imaginea QR
         qr = qrcode.QRCode(version=1, box_size=10, border=4)
-        qr.add_data(qr_token)  # QR-ul conține tokenul unic
+        qr.add_data(qr_token)
         qr.make(fit=True)
         img = qr.make_image(fill_color="black", back_color="white")
-
         buffer = io.BytesIO()
         img.save(buffer, format="PNG")
         buffer.seek(0)
         qr_image_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
 
-    # 5. Salvezi înregistrarea în DB
     registration = models.EventRegistration(
         event_id=event_id,
         user_id=user_id,
         status="registered",
-        qr_code_token=qr_token,  # None dacă nu e qr_code
+        qr_code_token=qr_token,
     )
     db.add(registration)
     db.commit()
     db.refresh(registration)
 
-
     db_user = db.query(models.User).filter(models.User.id == user_id).first()
-    #Trimitere mail de confiramre
     send_registration_email(
         to_email=db_user.email,
         user_name=db_user.full_name,
@@ -369,7 +580,7 @@ def register_to_event(event_id: int, db: Session = Depends(get_db), user=Depends
         event_location=event.location or "—",
         qr_image_base64=qr_image_base64
     )
-    # 6. Returnezi răspunsul
+
     response = {"message": "Înregistrat cu succes!", "status": "registered", "registration_id": registration.id}
 
     if qr_image_base64:
@@ -378,11 +589,34 @@ def register_to_event(event_id: int, db: Session = Depends(get_db), user=Depends
 
     return response
 
+
 @router.delete("/{event_id}/unregister")
 def unregister_from_event(event_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    """
+    Dezinscrie utilizatorul curent de la un eveniment.
+
+    Daca utilizatorul avea statusul 'registered', primul participant
+    din waitlist este promovat automat la 'registered', primeste un QR code
+    (daca entry_type == 'qr_code') si un email de notificare.
+    Pozitiile din waitlist sunt reordonate dupa promovare.
+
+    Daca utilizatorul era pe waitlist, este sters fara a promova pe altcineva.
+
+    Args:
+        event_id (int): ID-ul evenimentului de la care se face dezinscrierea.
+        db (Session): Sesiunea bazei de date.
+        user (dict): Payload-ul JWT al utilizatorului curent.
+
+    Returns:
+        dict: Mesaj de confirmare.
+            Exemplu: {"message": "Te-ai dezînscris cu succes!"}
+
+    Raises:
+        HTTPException 404: Daca utilizatorul nu este inscris la eveniment.
+        HTTPException 401: Daca utilizatorul nu este autentificat.
+    """
     user_id = user["user_id"]
 
-    # ← caută atât "registered" cât și "waitlist"
     registration = db.query(models.EventRegistration).filter(
         models.EventRegistration.event_id == event_id,
         models.EventRegistration.user_id == user_id,
@@ -392,15 +626,12 @@ def unregister_from_event(event_id: int, db: Session = Depends(get_db), user=Dep
     if not registration:
         raise HTTPException(status_code=404, detail="Nu ești înregistrat la acest eveniment!")
 
-    was_registered = registration.status == "registered"  # ← reține dacă era registered
-
+    was_registered = registration.status == "registered"
     event = db.query(models.Event).filter(models.Event.id == event_id).first()
 
     db.delete(registration)
     db.flush()
 
-    # Promovezi din waitlist DOAR dacă cel care pleacă era "registered"
-    # (dacă era pe waitlist, nu se eliberează un loc real)
     if was_registered:
         next_in_waitlist = db.query(models.EventRegistration).filter(
             models.EventRegistration.event_id == event_id,
@@ -428,10 +659,10 @@ def unregister_from_event(event_id: int, db: Session = Depends(get_db), user=Dep
             next_in_waitlist.registered_at = datetime.utcnow()
 
             db.flush()
-            # Reordonezi restul din waitlist
+
             remaining = db.query(models.EventRegistration).filter(
                 models.EventRegistration.event_id == event_id,
-                models.EventRegistration.status == "waitlist"  # ← nu îl mai include pe cel promovat
+                models.EventRegistration.status == "waitlist"
             ).order_by(models.EventRegistration.waitlist_position).all()
 
             for i, reg in enumerate(remaining):
@@ -456,12 +687,25 @@ def unregister_from_event(event_id: int, db: Session = Depends(get_db), user=Dep
     db.commit()
     return {"message": "Te-ai dezînscris cu succes!"}
 
-# POST feedback event
+
 @router.post("/{event_id}/feedback")
 def submit_feedback(event_id: int, feedback_data: dict, db: Session = Depends(get_db)):
+    """
+    Trimite un feedback pentru un eveniment.
+
+    Args:
+        event_id (int): ID-ul evenimentului pentru care se trimite feedback-ul.
+        feedback_data (dict): Datele feedback-ului. Campuri asteptate:
+            - rating (int): Nota de la 1 la 5.
+            - comment (str, optional): Comentariul textual.
+        db (Session): Sesiunea bazei de date.
+
+    Returns:
+        EventFeedback: Obiectul feedback salvat in baza de date.
+    """
     feedback = models.EventFeedback(
         event_id=event_id,
-        user_id=1,  # temporar, ulterior din JWT
+        user_id=1,
         rating=feedback_data.get("rating"),
         comment=feedback_data.get("comment")
     )
@@ -470,19 +714,52 @@ def submit_feedback(event_id: int, feedback_data: dict, db: Session = Depends(ge
     db.refresh(feedback)
     return feedback
 
-#GET metoda de preluare la care evenimnte sunt deja inregistrat returneaz doar ids
-@router.get("/my/ids")
-def get_my_event_ids(db: Session = Depends(get_db),user=Depends(get_current_user)):
-    user_id = user["user_id"]
 
+@router.get("/my/ids")
+def get_my_event_ids(db: Session = Depends(get_db), user=Depends(get_current_user)):
+    """
+    Returneaza lista ID-urilor evenimentelor la care utilizatorul curent este inscris.
+
+    Util pentru a verifica rapid in frontend care evenimente sunt bifate
+    ca inscrise, fara a incarca toate datele evenimentelor.
+
+    Args:
+        db (Session): Sesiunea bazei de date.
+        user (dict): Payload-ul JWT al utilizatorului curent.
+
+    Returns:
+        list[int]: Lista de ID-uri ale evenimentelor la care utilizatorul are o inregistrare.
+            Exemplu: [1, 5, 12]
+
+    Raises:
+        HTTPException 401: Daca utilizatorul nu este autentificat.
+    """
+    user_id = user["user_id"]
     registrations = db.query(models.EventRegistration).filter(
         models.EventRegistration.user_id == user_id
     ).all()
-
     return [r.event_id for r in registrations]
+
 
 @router.get("/{event_id}/is-registered")
 def is_registered(event_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    """
+    Verifica daca utilizatorul curent este inscris la un eveniment specific.
+
+    Args:
+        event_id (int): ID-ul evenimentului de verificat.
+        db (Session): Sesiunea bazei de date.
+        user (dict): Payload-ul JWT al utilizatorului curent.
+
+    Returns:
+        dict: Statusul inscrierii cu campurile:
+            - registered (bool): True daca utilizatorul are o inregistrare activa.
+            - status (str): 'registered', 'waitlist', 'attended' sau '' daca nu e inscris.
+            - waitlist_position (int | None): Pozitia in waitlist sau None.
+
+    Raises:
+        HTTPException 401: Daca utilizatorul nu este autentificat.
+    """
     user_id = user["user_id"]
     registration = db.query(models.EventRegistration).filter(
         models.EventRegistration.user_id == user_id,
@@ -494,14 +771,34 @@ def is_registered(event_id: int, db: Session = Depends(get_db), user=Depends(get
 
     return {
         "registered": True,
-        "status": registration.status,                        # "registered" sau "waitlist"
-        "waitlist_position": registration.waitlist_position   # numărul poziției sau None
+        "status": registration.status,
+        "waitlist_position": registration.waitlist_position
     }
 
 
-# GET qr-code al userului pentru un event
 @router.get("/{event_id}/my-qr")
 def get_my_qr(event_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    """
+    Returneaza imaginea QR code a utilizatorului curent pentru un eveniment.
+
+    QR code-ul este regenerat din tokenul unic salvat in baza de date
+    si returnat ca imagine PNG encodata in base64.
+
+    Args:
+        event_id (int): ID-ul evenimentului.
+        db (Session): Sesiunea bazei de date.
+        user (dict): Payload-ul JWT al utilizatorului curent.
+
+    Returns:
+        dict: Datele QR code-ului:
+            - qr_code (str): Imaginea PNG encodata base64 (format data URI).
+            - qr_token (str): Tokenul UUID unic al QR code-ului.
+
+    Raises:
+        HTTPException 404: Daca utilizatorul nu este inscris la eveniment.
+        HTTPException 404: Daca evenimentul nu foloseste QR code (entry_type != 'qr_code').
+        HTTPException 401: Daca utilizatorul nu este autentificat.
+    """
     user_id = user["user_id"]
 
     registration = db.query(models.EventRegistration).filter(
@@ -514,7 +811,7 @@ def get_my_qr(event_id: int, db: Session = Depends(get_db), user=Depends(get_cur
 
     if not registration.qr_code_token:
         raise HTTPException(status_code=404, detail="Acest eveniment nu folosește QR")
-    # Regenerezi imaginea din token
+
     qr = qrcode.QRCode(version=1, box_size=10, border=4)
     qr.add_data(registration.qr_code_token)
     qr.make(fit=True)
@@ -531,9 +828,30 @@ def get_my_qr(event_id: int, db: Session = Depends(get_db), user=Depends(get_cur
     }
 
 
-# POST verificare QR la intrare (folosit de organizator)
 @router.post("/{event_id}/verify-qr")
 def verify_qr(event_id: int, body: dict, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    """
+    Verifica un token QR la intrarea participantului la eveniment.
+
+    Folosit de organizator pentru a scana si valida QR code-ul unui participant.
+    La validare cu succes, statusul inscrierii devine 'attended' si se
+    marcheaza check-in-ul cu timestamp-ul curent.
+
+    Args:
+        event_id (int): ID-ul evenimentului la care se face verificarea.
+        body (dict): Corpul requestului continand campul 'token' (str UUID).
+        db (Session): Sesiunea bazei de date.
+        user (dict): Payload-ul JWT al organizatorului autentificat.
+
+    Returns:
+        dict: Rezultatul verificarii.
+            Exemplu: {"valid": True, "message": "Intrare confirmată!"}
+
+    Raises:
+        HTTPException 404: Daca tokenul QR nu corespunde niciunei inregistrari.
+        HTTPException 400: Daca QR code-ul a fost deja folosit (status 'attended').
+        HTTPException 401: Daca utilizatorul nu este autentificat.
+    """
     token = body.get("token")
 
     registration = db.query(models.EventRegistration).filter(
@@ -554,9 +872,24 @@ def verify_qr(event_id: int, body: dict, db: Session = Depends(get_db), user=Dep
 
     return {"valid": True, "message": "Intrare confirmată!"}
 
-# POST add sponsors
+
 @router.post("/{event_id}/sponsors")
 def add_sponsor(event_id: int, sponsor_data: SponsorCreate, db: Session = Depends(get_db)):
+    """
+    Adauga un sponsor la un eveniment.
+
+    Args:
+        event_id (int): ID-ul evenimentului la care se adauga sponsorul.
+        sponsor_data (SponsorCreate): Datele sponsorului: name, logo_url, website_url.
+        db (Session): Sesiunea bazei de date.
+
+    Returns:
+        dict: Mesaj de confirmare, ID-ul si numele sponsorului adaugat.
+            Exemplu: {"message": "Sponsor adăugat!", "id": 3, "name": "Acme Corp"}
+
+    Raises:
+        HTTPException 404: Daca evenimentul nu exista.
+    """
     event = db.query(models.Event).filter(models.Event.id == event_id).first()
     if not event:
         raise HTTPException(status_code=404, detail="Evenimentul nu există")
@@ -571,9 +904,25 @@ def add_sponsor(event_id: int, sponsor_data: SponsorCreate, db: Session = Depend
     db.commit()
     db.refresh(sponsor)
     return {"message": "Sponsor adăugat!", "id": sponsor.id, "name": sponsor.name}
-#DELETE stergere sponsor dupa id
+
+
 @router.delete("/{event_id}/sponsors/{sponsor_id}")
 def delete_sponsor(event_id: int, sponsor_id: int, db: Session = Depends(get_db)):
+    """
+    Sterge un sponsor dintr-un eveniment dupa ID.
+
+    Args:
+        event_id (int): ID-ul evenimentului.
+        sponsor_id (int): ID-ul sponsorului de sters.
+        db (Session): Sesiunea bazei de date.
+
+    Returns:
+        dict: Mesaj de confirmare.
+            Exemplu: {"message": "Sponsor șters!"}
+
+    Raises:
+        HTTPException 404: Daca sponsorul nu exista sau nu apartine evenimentului.
+    """
     sponsor = db.query(models.EventSponsor).filter(
         models.EventSponsor.id == sponsor_id,
         models.EventSponsor.event_id == event_id
@@ -584,14 +933,32 @@ def delete_sponsor(event_id: int, sponsor_id: int, db: Session = Depends(get_db)
     db.commit()
     return {"message": "Sponsor șters!"}
 
-# ============ MATERIALE ============
-#POST adaugare materiale
+
 @router.post("/{event_id}/materials")
 def upload_materials(
-    event_id: int,
-    files: List[UploadFile] = File(...),
-    db: Session = Depends(get_db)
+        event_id: int,
+        files: List[UploadFile] = File(...),
+        db: Session = Depends(get_db)
 ):
+    """
+    Incarca unul sau mai multe fisiere ca materiale pentru un eveniment.
+
+    Fisierele sunt salvate pe disk in directorul 'uploads/events/{event_id}/'.
+    Numele fisierelor sunt sanitizate automat pentru a elimina caracterele speciale.
+    Metadatele fiecarui fisier (nume, tip, dimensiune, cale) sunt salvate in baza de date.
+
+    Args:
+        event_id (int): ID-ul evenimentului la care se ataseaza materialele.
+        files (List[UploadFile]): Lista de fisiere uploadate prin multipart/form-data.
+        db (Session): Sesiunea bazei de date.
+
+    Returns:
+        dict: Mesaj de confirmare si lista fisierelor salvate cu name, size_kb si type.
+            Exemplu: {"message": "2 fișiere încărcate!", "files": [...]}
+
+    Raises:
+        HTTPException 404: Daca evenimentul nu exista.
+    """
     event = db.query(models.Event).filter(models.Event.id == event_id).first()
     if not event:
         raise HTTPException(status_code=404, detail="Evenimentul nu există")
@@ -601,7 +968,7 @@ def upload_materials(
 
     saved = []
     for file in files:
-        safe_name = sanitize_filename(file.filename)  # ← nume curat
+        safe_name = sanitize_filename(file.filename)
         file_path = f"{upload_dir}/{safe_name}"
 
         with open(file_path, "wb") as f:
@@ -613,9 +980,9 @@ def upload_materials(
         material = models.EventMaterial(
             event_id=event_id,
             uploaded_by=1,
-            file_name=file.filename,   # numele original afișat în UI
+            file_name=file.filename,
             file_type=ext,
-            file_path=file_path,       # path-ul cu nume curat pe disk
+            file_path=file_path,
             file_size_kb=size_kb
         )
         db.add(material)
@@ -623,9 +990,25 @@ def upload_materials(
 
     db.commit()
     return {"message": f"{len(saved)} fișiere încărcate!", "files": saved}
-#DELETE sterge material dupa id
+
+
 @router.delete("/{event_id}/materials/{material_id}")
 def delete_material(event_id: int, material_id: int, db: Session = Depends(get_db)):
+    """
+    Sterge un material dintr-un eveniment si fisierul aferent de pe disk.
+
+    Args:
+        event_id (int): ID-ul evenimentului.
+        material_id (int): ID-ul materialului de sters.
+        db (Session): Sesiunea bazei de date.
+
+    Returns:
+        dict: Mesaj de confirmare.
+            Exemplu: {"message": "Material șters!"}
+
+    Raises:
+        HTTPException 404: Daca materialul nu exista sau nu apartine evenimentului.
+    """
     material = db.query(models.EventMaterial).filter(
         models.EventMaterial.id == material_id,
         models.EventMaterial.event_id == event_id
@@ -633,7 +1016,6 @@ def delete_material(event_id: int, material_id: int, db: Session = Depends(get_d
     if not material:
         raise HTTPException(status_code=404, detail="Materialul negăsit")
 
-    # Șterge fișierul de pe disk
     if os.path.exists(material.file_path):
         os.remove(material.file_path)
 
@@ -641,46 +1023,33 @@ def delete_material(event_id: int, material_id: int, db: Session = Depends(get_d
     db.commit()
     return {"message": "Material șters!"}
 
-#Functie de preluare sentiment pe baza de feddBack
-def get_sentiment(feedbacks) -> dict:
-    if not feedbacks:
-        return {"label": "Fără recenzii", "color": "neutral", "emoji": "⚪"}
 
-    avg = sum(f.rating for f in feedbacks) / len(feedbacks)
-
-    if avg >= 4.0:
-        return {"label": "Foarte pozitiv", "color": "positive", "emoji": "🟢"}
-    elif avg >= 3.0:
-        return {"label": "Mixt", "color": "mixed", "emoji": "🟡"}
-    elif avg >= 2.0:
-        return {"label": "Negativ", "color": "negative", "emoji": "🔴"}
-    else:
-        return {"label": "Foarte negativ", "color": "very_negative", "emoji": "⛔"}
-
-
-@router.get("/")
-def get_events(db: Session = Depends(get_db)):
-    events = db.query(models.Event).all()
-    result = []
-    for event in events:
-        sentiment = get_sentiment(event.feedbacks)
-        result.append({
-            # ... toate câmpurile existente ...
-            "sentiment": sentiment,
-            "avg_rating": round(sum(f.rating for f in event.feedbacks) / len(event.feedbacks),
-                                1) if event.feedbacks else None,
-            "feedback_count": len(event.feedbacks),
-        })
-    return result
-
-#get toti participantio la evenimentul x.
 @router.get("/{event_id}/participants")
 def get_participants(event_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    """
+    Returneaza lista completa a participantilor la un eveniment.
+
+    Accesibil doar de catre organizatorul evenimentului sau utilizatorii cu rolul 'admin'.
+    Include informatii despre status, pozitia in waitlist si check-in.
+
+    Args:
+        event_id (int): ID-ul evenimentului.
+        db (Session): Sesiunea bazei de date.
+        user (dict): Payload-ul JWT al utilizatorului curent.
+
+    Returns:
+        list[dict]: Lista participantilor cu campurile: id, user_id, full_name,
+            email, status, waitlist_position, registered_at, checked_in, checked_in_at.
+
+    Raises:
+        HTTPException 404: Daca evenimentul nu exista.
+        HTTPException 403: Daca utilizatorul nu este organizatorul sau admin.
+        HTTPException 401: Daca utilizatorul nu este autentificat.
+    """
     event = db.query(models.Event).filter(models.Event.id == event_id).first()
     if not event:
         raise HTTPException(status_code=404, detail="Evenimentul nu există")
 
-    # Doar organizatorul sau admin poate vedea lista
     if event.organizer_id != user["user_id"] and user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Acces interzis!")
 
@@ -702,12 +1071,69 @@ def get_participants(event_id: int, db: Session = Depends(get_db), user=Depends(
         }
         for r in registrations
     ]
-#HELPERS
+
+
+def get_sentiment(feedbacks) -> dict:
+    """
+    Calculeaza sentimentul agregat pe baza rating-urilor din feedback-uri.
+
+    Folosit intern pentru a clasifica perceptia generala a participantilor
+    despre un eveniment, bazat pe media rating-urilor primite.
+
+    Args:
+        feedbacks (list): Lista obiectelor EventFeedback, fiecare avand campul 'rating'.
+
+    Returns:
+        dict: Dictionarul cu sentimentul calculat, continand campurile:
+            - label (str): Eticheta textuala a sentimentului.
+            - color (str): Identificatorul de culoare ('positive', 'mixed', 'negative', 'very_negative', 'neutral').
+            - emoji (str): Emoji reprezentativ.
+
+    Examples:
+        Valorile posibile returnate:
+
+        - Rating mediu >= 4.0: {"label": "Foarte pozitiv", "color": "positive", "emoji": "🟢"}
+        - Rating mediu >= 3.0: {"label": "Mixt", "color": "mixed", "emoji": "🟡"}
+        - Rating mediu >= 2.0: {"label": "Negativ", "color": "negative", "emoji": "🔴"}
+        - Rating mediu < 2.0:  {"label": "Foarte negativ", "color": "very_negative", "emoji": "⛔"}
+        - Fara feedback:       {"label": "Fără recenzii", "color": "neutral", "emoji": "⚪"}
+    """
+    if not feedbacks:
+        return {"label": "Fără recenzii", "color": "neutral", "emoji": "⚪"}
+
+    avg = sum(f.rating for f in feedbacks) / len(feedbacks)
+
+    if avg >= 4.0:
+        return {"label": "Foarte pozitiv", "color": "positive", "emoji": "🟢"}
+    elif avg >= 3.0:
+        return {"label": "Mixt", "color": "mixed", "emoji": "🟡"}
+    elif avg >= 2.0:
+        return {"label": "Negativ", "color": "negative", "emoji": "🔴"}
+    else:
+        return {"label": "Foarte negativ", "color": "very_negative", "emoji": "⛔"}
+
+
 def sanitize_filename(filename: str) -> str:
-    # Păstrezi extensia
+    """
+    Sanitizeaza numele unui fisier pentru a fi salvat in siguranta pe disk.
+
+    Elimina sau inlocuieste caracterele speciale care ar putea cauza probleme
+    in sistemul de fisiere, pastrând extensia originala a fisierului.
+
+    Args:
+        filename (str): Numele original al fisierului uploadat.
+
+    Returns:
+        str: Numele sanitizat, cu caracterele speciale inlocuite prin underscore
+            si underscore-urile consecutive reduse la unul singur.
+
+    Examples:
+        >>> sanitize_filename("raport final (2025).pdf")
+        'raport_final__2025_.pdf'
+        >>> sanitize_filename("fisier___test.docx")
+        'fisier_test.docx'
+    """
     name, ext = os.path.splitext(filename)
-    # Înlocuiești orice caracter special cu underscore
     name = re.sub(r'[^\w\-]', '_', name)
-    # Elimini underscore-uri multiple consecutive
     name = re.sub(r'_+', '_', name)
     return f"{name}{ext}"
