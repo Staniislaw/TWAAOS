@@ -1,3 +1,4 @@
+from typing import Annotated, Optional, List
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from database.database import get_db
@@ -20,7 +21,10 @@ import qrcode
 import io
 import base64
 
+
 router = APIRouter(prefix="/events", tags=["Events"])
+DbSession = Annotated[Session, Depends(get_db)]
+CurrentUser = Annotated[dict, Depends(get_current_user)]
 
 
 class EventCreate(BaseModel):
@@ -52,7 +56,7 @@ class EventCreate(BaseModel):
     registration_deadline: Optional[str] = None
     location: Optional[str] = None
     participation_mode: Optional[str] = "In-Person"
-    entry_type: Optional[str] = 'free'
+    entry_type: Optional[str] = "free"
     max_participants: Optional[int] = None
     status: Optional[str] = "active"
     registration_link: Optional[str] = None
@@ -92,10 +96,54 @@ class EventResponse(BaseModel):
 
     class Config:
         from_attributes = True
+def serialize_event_full(event: models.Event, include_rejection: bool = False) -> dict:
+    sentiment = get_sentiment(event.feedbacks)
+    data = {
+        "id": event.id,
+        "title": event.title,
+        "description": event.description,
+        "category": event.category,
+        "faculty": event.faculty,
+        "start_datetime": str(event.start_datetime) if event.start_datetime else None,
+        "end_datetime": str(event.end_datetime) if event.end_datetime else None,
+        "location": event.location,
+        "participation_mode": event.participation_mode,
+        "status": event.status,
+        "entry_type": event.entry_type,
+        "max_participants": event.max_participants,
+        "registration_deadline": str(event.registration_deadline) if event.registration_deadline else None,
+        "registration_link": event.registration_link,
+        "created_at": str(event.created_at),
+        "updated_at": str(event.updated_at),
+        "organizer_id": event.organizer_id,
+        "organizer_name": event.organizer.full_name if event.organizer else "Necunoscut",
+        "sponsors": [
+            {"name": s.name, "logo_path": s.logo_path, "website_url": s.website_url}
+            for s in event.sponsors
+        ],
+        "sentiment": sentiment,
+        "avg_rating": round(
+            sum(f.rating for f in event.feedbacks) / len(event.feedbacks), 1
+        ) if event.feedbacks else None,
+        "feedback_count": len(event.feedbacks),
+    }
+    if include_rejection:
+        data["rejection_reason"] = event.rejection_reason
+    return data
+
+def generate_qr_base64(token: str) -> str:
+    qr = qrcode.QRCode(version=1, box_size=10, border=4)
+    qr.add_data(token)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="black", back_color="white")
+    buffer = io.BytesIO()
+    img.save(buffer, format="PNG")
+    buffer.seek(0)
+    return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
 
 @router.get("/")
-def get_events(db: Session = Depends(get_db)):
+def get_events(db: DbSession) -> list:
     """
     Returneaza lista tuturor evenimentelor disponibile.
 
@@ -116,42 +164,11 @@ def get_events(db: Session = Depends(get_db)):
     events = db.query(models.Event).filter(
         models.Event.status.notin_(["pending", "rejected"])
     ).all()
-    result = []
-    for event in events:
-        sentiment = get_sentiment(event.feedbacks)
-        result.append({
-            "id": event.id,
-            "title": event.title,
-            "description": event.description,
-            "category": event.category,
-            "faculty": event.faculty,
-            "start_datetime": str(event.start_datetime) if event.start_datetime else None,
-            "end_datetime": str(event.end_datetime) if event.end_datetime else None,
-            "location": event.location,
-            "participation_mode": event.participation_mode,
-            "status": event.status,
-            "entry_type": event.entry_type,
-            "max_participants": event.max_participants,
-            "registration_deadline": str(event.registration_deadline) if event.registration_deadline else None,
-            "registration_link": event.registration_link,
-            "created_at": str(event.created_at),
-            "updated_at": str(event.updated_at),
-            "organizer_id": event.organizer_id,
-            "organizer_name": event.organizer.full_name if event.organizer else "Necunoscut",
-            "sponsors": [
-                {"name": s.name, "logo_path": s.logo_path, "website_url": s.website_url}
-                for s in event.sponsors
-            ],
-            "sentiment": sentiment,
-            "avg_rating": round(sum(f.rating for f in event.feedbacks) / len(event.feedbacks),
-                                1) if event.feedbacks else None,
-            "feedback_count": len(event.feedbacks),
-        })
-    return result
+    return [serialize_event_full(e) for e in events]
 
 
 @router.get("/my/created")
-def get_my_created_events(db: Session = Depends(get_db), user=Depends(get_current_user)):
+def get_my_created_events(db: DbSession, user: CurrentUser) -> list:
     """
     Returneaza evenimentele create de utilizatorul autentificat curent.
 
@@ -169,45 +186,14 @@ def get_my_created_events(db: Session = Depends(get_db), user=Depends(get_curren
     Raises:
         HTTPException 401: Daca tokenul JWT lipseste sau este invalid.
     """
-    user_id = user["user_id"]
-    events = db.query(models.Event).filter(models.Event.organizer_id == user_id).all()
-    result = []
-    for event in events:
-        sentiment = get_sentiment(event.feedbacks)
-        result.append({
-            "id": event.id,
-            "title": event.title,
-            "description": event.description,
-            "category": event.category,
-            "faculty": event.faculty,
-            "start_datetime": str(event.start_datetime) if event.start_datetime else None,
-            "end_datetime": str(event.end_datetime) if event.end_datetime else None,
-            "location": event.location,
-            "participation_mode": event.participation_mode,
-            "status": event.status,
-            "rejection_reason": event.rejection_reason,
-            "entry_type": event.entry_type,
-            "max_participants": event.max_participants,
-            "registration_deadline": str(event.registration_deadline) if event.registration_deadline else None,
-            "registration_link": event.registration_link,
-            "created_at": str(event.created_at),
-            "updated_at": str(event.updated_at),
-            "organizer_id": event.organizer_id,
-            "organizer_name": event.organizer.full_name if event.organizer else "Necunoscut",
-            "sponsors": [
-                {"name": s.name, "logo_path": s.logo_path, "website_url": s.website_url}
-                for s in event.sponsors
-            ],
-            "sentiment": sentiment,
-            "avg_rating": round(sum(f.rating for f in event.feedbacks) / len(event.feedbacks),
-                                1) if event.feedbacks else None,
-            "feedback_count": len(event.feedbacks),
-        })
-    return result
+    events = db.query(models.Event).filter(
+        models.Event.organizer_id == user["user_id"]
+    ).all()
+    return [serialize_event_full(e, include_rejection=True) for e in events]
 
 
 @router.get("/{event_id}")
-def get_event(event_id: int, db: Session = Depends(get_db)):
+def get_event(event_id: int, db: DbSession) -> dict:
     """
     Returneaza detaliile complete ale unui eveniment dupa ID.
 
@@ -228,49 +214,28 @@ def get_event(event_id: int, db: Session = Depends(get_db)):
     event = db.query(models.Event).filter(models.Event.id == event_id).first()
     if not event:
         raise HTTPException(status_code=404, detail="Evenimentul nu a fost găsit")
-    sentiment = get_sentiment(event.feedbacks)
-    return {
-        "id": event.id,
-        "title": event.title,
-        "description": event.description,
-        "category": event.category,
-        "faculty": event.faculty,
-        "start_datetime": str(event.start_datetime) if event.start_datetime else None,
-        "end_datetime": str(event.end_datetime) if event.end_datetime else None,
-        "location": event.location,
-        "participation_mode": event.participation_mode,
-        "status": event.status,
-        "entry_type": event.entry_type,
-        "max_participants": event.max_participants,
-        "registration_deadline": str(event.registration_deadline) if event.registration_deadline else None,
-        "registration_link": event.registration_link,
-        "created_at": str(event.created_at),
-        "updated_at": str(event.updated_at),
-        "organizer_id": event.organizer_id,
-        "organizer_name": event.organizer.full_name if event.organizer else "Necunoscut",
-        "sponsors": [
-            {"id": s.id, "name": s.name, "logo_path": s.logo_path, "website_url": s.website_url}
-            for s in event.sponsors
-        ],
-        "sentiment": sentiment,
-        "avg_rating": round(sum(f.rating for f in event.feedbacks) / len(event.feedbacks),
-                            1) if event.feedbacks else None,
-        "feedback_count": len(event.feedbacks),
-        "materials": [
-            {
-                "id": m.id,
-                "file_name": m.file_name,
-                "file_type": m.file_type,
-                "file_size_kb": m.file_size_kb,
-                "file_path": m.file_path
-            }
-            for m in event.materials
-        ]
-    }
+
+    data = serialize_event_full(event)
+    data["materials"] = [
+        {
+            "id": m.id,
+            "file_name": m.file_name,
+            "file_type": m.file_type,
+            "file_size_kb": m.file_size_kb,
+            "file_path": m.file_path,
+        }
+        for m in event.materials
+    ]
+    # sponsors cu id inclus pentru GET single event
+    data["sponsors"] = [
+        {"id": s.id, "name": s.name, "logo_path": s.logo_path, "website_url": s.website_url}
+        for s in event.sponsors
+    ]
+    return data
 
 
 @router.post("/")
-def create_event(event_data: EventCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
+def create_event(event_data: EventCreate, db: DbSession, user: CurrentUser) -> dict:
     """
     Creeaza un eveniment nou in baza de date.
 
@@ -306,7 +271,7 @@ def create_event(event_data: EventCreate, db: Session = Depends(get_db), user=De
             max_participants=event_data.max_participants,
             status="pending",
             registration_link=event_data.registration_link,
-            organizer_id=user["user_id"]
+            organizer_id=user["user_id"],
         )
         db.add(new_event)
         db.commit()
@@ -316,10 +281,8 @@ def create_event(event_data: EventCreate, db: Session = Depends(get_db), user=De
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
-
 @router.put("/{event_id}")
-def update_event(event_id: int, event_data: EventCreate, db: Session = Depends(get_db),
-                 user=Depends(get_current_user)):
+def update_event(event_id: int, event_data: EventCreate, db: DbSession, user: CurrentUser) -> dict:
     """
     Actualizeaza datele unui eveniment existent.
 
@@ -344,7 +307,6 @@ def update_event(event_id: int, event_data: EventCreate, db: Session = Depends(g
     event = db.query(models.Event).filter(models.Event.id == event_id).first()
     if not event:
         raise HTTPException(status_code=404, detail="Evenimentul nu a fost găsit")
-
     if event.organizer_id != user["user_id"] and user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Nu ai permisiunea să editezi acest eveniment")
 
@@ -369,9 +331,8 @@ def update_event(event_id: int, event_data: EventCreate, db: Session = Depends(g
     db.refresh(event)
     return {"message": "Eveniment actualizat!", "id": event.id}
 
-
 @router.delete("/{event_id}")
-def delete_event(event_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
+def delete_event(event_id: int, db: DbSession, user: CurrentUser) -> dict:
     """
     Sterge un eveniment din baza de date.
 
@@ -403,7 +364,7 @@ def delete_event(event_id: int, db: Session = Depends(get_db), user=Depends(get_
 
 
 @router.get("/{event_id}/materials")
-def get_event_materials(event_id: int, db: Session = Depends(get_db)):
+def get_event_materials(event_id: int, db: DbSession) -> list:
     """
     Returneaza lista materialelor atasate unui eveniment.
 
@@ -420,7 +381,7 @@ def get_event_materials(event_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{event_id}/feedback")
-def get_event_feedback(event_id: int, db: Session = Depends(get_db)):
+def get_event_feedback(event_id: int, db: DbSession) -> list:
     """
     Returneaza toate feedback-urile primite pentru un eveniment.
 
@@ -437,7 +398,7 @@ def get_event_feedback(event_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{event_id}/sponsors")
-def get_event_sponsors(event_id: int, db: Session = Depends(get_db)):
+def get_event_sponsors(event_id: int, db: DbSession) -> list:
     """
     Returneaza lista sponsorilor unui eveniment.
 
@@ -454,7 +415,7 @@ def get_event_sponsors(event_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{event_id}/register")
-def register_to_event(event_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
+def register_to_event(event_id: int, db: DbSession, user: CurrentUser) -> dict:
     """
     Inscrie utilizatorul curent la un eveniment.
 
@@ -508,22 +469,24 @@ def register_to_event(event_id: int, db: Session = Depends(get_db), user=Depends
     existing = db.query(models.EventRegistration).filter(
         models.EventRegistration.event_id == event_id,
         models.EventRegistration.user_id == user_id,
-        models.EventRegistration.status.in_(["registered", "waitlist"])
+        models.EventRegistration.status.in_(["registered", "waitlist"]),
     ).first()
     if existing:
         raise HTTPException(status_code=400, detail="Ești deja înregistrat la acest eveniment!")
 
     registered_count = db.query(models.EventRegistration).filter(
         models.EventRegistration.event_id == event_id,
-        models.EventRegistration.status == "registered"
+        models.EventRegistration.status == "registered",
     ).count()
 
     is_full = event.max_participants and registered_count >= event.max_participants
 
+    db_user = db.query(models.User).filter(models.User.id == user_id).first()
+
     if is_full:
         waitlist_count = db.query(models.EventRegistration).filter(
             models.EventRegistration.event_id == event_id,
-            models.EventRegistration.status == "waitlist"
+            models.EventRegistration.status == "waitlist",
         ).count()
 
         registration = models.EventRegistration(
@@ -536,33 +499,24 @@ def register_to_event(event_id: int, db: Session = Depends(get_db), user=Depends
         db.add(registration)
         db.commit()
 
-        db_user = db.query(models.User).filter(models.User.id == user_id).first()
         send_waitlist_email(
             to_email=db_user.email,
             user_name=db_user.full_name,
             event_title=event.title,
-            position=waitlist_count + 1
+            position=waitlist_count + 1,
         )
-
         return {
             "message": f"Evenimentul e complet! Ești pe lista de așteptare pe poziția {waitlist_count + 1}.",
             "status": "waitlist",
-            "waitlist_position": waitlist_count + 1
+            "waitlist_position": waitlist_count + 1,
         }
 
+    # ✅ generate_qr_base64 în loc de cod duplicat
     qr_token = None
     qr_image_base64 = None
-
     if event.entry_type == "qr_code":
         qr_token = str(uuid.uuid4())
-        qr = qrcode.QRCode(version=1, box_size=10, border=4)
-        qr.add_data(qr_token)
-        qr.make(fit=True)
-        img = qr.make_image(fill_color="black", back_color="white")
-        buffer = io.BytesIO()
-        img.save(buffer, format="PNG")
-        buffer.seek(0)
-        qr_image_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+        qr_image_base64 = generate_qr_base64(qr_token)
 
     registration = models.EventRegistration(
         event_id=event_id,
@@ -574,27 +528,24 @@ def register_to_event(event_id: int, db: Session = Depends(get_db), user=Depends
     db.commit()
     db.refresh(registration)
 
-    db_user = db.query(models.User).filter(models.User.id == user_id).first()
     send_registration_email(
         to_email=db_user.email,
         user_name=db_user.full_name,
         event_title=event.title,
         event_date=str(event.start_datetime),
         event_location=event.location or "—",
-        qr_image_base64=qr_image_base64
+        qr_image_base64=qr_image_base64,
     )
 
     response = {"message": "Înregistrat cu succes!", "status": "registered", "registration_id": registration.id}
-
     if qr_image_base64:
         response["qr_code"] = f"data:image/png;base64,{qr_image_base64}"
         response["qr_token"] = qr_token
-
     return response
 
 
 @router.delete("/{event_id}/unregister")
-def unregister_from_event(event_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
+def unregister_from_event(event_id: int, db: DbSession, user: CurrentUser) -> dict:
     """
     Dezinscrie utilizatorul curent de la un eveniment.
 
@@ -623,9 +574,8 @@ def unregister_from_event(event_id: int, db: Session = Depends(get_db), user=Dep
     registration = db.query(models.EventRegistration).filter(
         models.EventRegistration.event_id == event_id,
         models.EventRegistration.user_id == user_id,
-        models.EventRegistration.status.in_(["registered", "waitlist"])
+        models.EventRegistration.status.in_(["registered", "waitlist"]),
     ).first()
-
     if not registration:
         raise HTTPException(status_code=404, detail="Nu ești înregistrat la acest eveniment!")
 
@@ -638,34 +588,25 @@ def unregister_from_event(event_id: int, db: Session = Depends(get_db), user=Dep
     if was_registered:
         next_in_waitlist = db.query(models.EventRegistration).filter(
             models.EventRegistration.event_id == event_id,
-            models.EventRegistration.status == "waitlist"
+            models.EventRegistration.status == "waitlist",
         ).order_by(models.EventRegistration.waitlist_position).first()
 
         if next_in_waitlist:
             qr_token = None
             qr_image_base64 = None
-
             if event.entry_type == "qr_code":
                 qr_token = str(uuid.uuid4())
-                qr = qrcode.QRCode(version=1, box_size=10, border=4)
-                qr.add_data(qr_token)
-                qr.make(fit=True)
-                img = qr.make_image(fill_color="black", back_color="white")
-                buffer = io.BytesIO()
-                img.save(buffer, format="PNG")
-                buffer.seek(0)
-                qr_image_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+                qr_image_base64 = generate_qr_base64(qr_token)
 
             next_in_waitlist.status = "registered"
             next_in_waitlist.waitlist_position = None
             next_in_waitlist.qr_code_token = qr_token
             next_in_waitlist.registered_at = datetime.utcnow()
-
             db.flush()
 
             remaining = db.query(models.EventRegistration).filter(
                 models.EventRegistration.event_id == event_id,
-                models.EventRegistration.status == "waitlist"
+                models.EventRegistration.status == "waitlist",
             ).order_by(models.EventRegistration.waitlist_position).all()
 
             for i, reg in enumerate(remaining):
@@ -676,14 +617,13 @@ def unregister_from_event(event_id: int, db: Session = Depends(get_db), user=Dep
             promoted_user = db.query(models.User).filter(
                 models.User.id == next_in_waitlist.user_id
             ).first()
-
             send_promoted_from_waitlist_email(
                 to_email=promoted_user.email,
                 user_name=promoted_user.full_name,
                 event_title=event.title,
                 event_date=str(event.start_datetime),
                 event_location=event.location or "—",
-                qr_image_base64=qr_image_base64
+                qr_image_base64=qr_image_base64,
             )
             return {"message": "Te-ai dezînscris cu succes!"}
 
@@ -692,7 +632,7 @@ def unregister_from_event(event_id: int, db: Session = Depends(get_db), user=Dep
 
 
 @router.post("/{event_id}/feedback")
-def submit_feedback(event_id: int, feedback_data: dict, db: Session = Depends(get_db)):
+def submit_feedback(event_id: int, feedback_data: dict, db: DbSession) -> dict:
     """
     Trimite un feedback pentru un eveniment.
 
@@ -710,16 +650,16 @@ def submit_feedback(event_id: int, feedback_data: dict, db: Session = Depends(ge
         event_id=event_id,
         user_id=1,
         rating=feedback_data.get("rating"),
-        comment=feedback_data.get("comment")
+        comment=feedback_data.get("comment"),
     )
     db.add(feedback)
     db.commit()
     db.refresh(feedback)
-    return feedback
+    return {"message": "Feedback trimis!", "id": feedback.id}
 
 
 @router.get("/my/ids")
-def get_my_event_ids(db: Session = Depends(get_db), user=Depends(get_current_user)):
+def get_my_event_ids(db: DbSession, user: CurrentUser) -> list[int]:
     """
     Returneaza lista ID-urilor evenimentelor la care utilizatorul curent este inscris.
 
@@ -737,15 +677,14 @@ def get_my_event_ids(db: Session = Depends(get_db), user=Depends(get_current_use
     Raises:
         HTTPException 401: Daca utilizatorul nu este autentificat.
     """
-    user_id = user["user_id"]
     registrations = db.query(models.EventRegistration).filter(
-        models.EventRegistration.user_id == user_id
+        models.EventRegistration.user_id == user["user_id"]
     ).all()
     return [r.event_id for r in registrations]
 
 
 @router.get("/{event_id}/is-registered")
-def is_registered(event_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
+def is_registered(event_id: int, db: DbSession, user: CurrentUser) -> dict:
     """
     Verifica daca utilizatorul curent este inscris la un eveniment specific.
 
@@ -763,24 +702,16 @@ def is_registered(event_id: int, db: Session = Depends(get_db), user=Depends(get
     Raises:
         HTTPException 401: Daca utilizatorul nu este autentificat.
     """
-    user_id = user["user_id"]
     registration = db.query(models.EventRegistration).filter(
-        models.EventRegistration.user_id == user_id,
-        models.EventRegistration.event_id == event_id
+        models.EventRegistration.user_id == user["user_id"],
+        models.EventRegistration.event_id == event_id,
     ).first()
-
     if not registration:
         return {"registered": False, "status": "", "waitlist_position": None}
-
-    return {
-        "registered": True,
-        "status": registration.status,
-        "waitlist_position": registration.waitlist_position
-    }
-
+    return {"registered": True, "status": registration.status, "waitlist_position": registration.waitlist_position}
 
 @router.get("/{event_id}/my-qr")
-def get_my_qr(event_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
+def get_my_qr(event_id: int, db: DbSession, user: CurrentUser) -> dict:
     """
     Returneaza imaginea QR code a utilizatorului curent pentru un eveniment.
 
@@ -802,37 +733,23 @@ def get_my_qr(event_id: int, db: Session = Depends(get_db), user=Depends(get_cur
         HTTPException 404: Daca evenimentul nu foloseste QR code (entry_type != 'qr_code').
         HTTPException 401: Daca utilizatorul nu este autentificat.
     """
-    user_id = user["user_id"]
-
     registration = db.query(models.EventRegistration).filter(
         models.EventRegistration.event_id == event_id,
-        models.EventRegistration.user_id == user_id
+        models.EventRegistration.user_id == user["user_id"],
     ).first()
-
     if not registration:
         raise HTTPException(status_code=404, detail="Nu ești înregistrat la acest eveniment")
-
     if not registration.qr_code_token:
         raise HTTPException(status_code=404, detail="Acest eveniment nu folosește QR")
 
-    qr = qrcode.QRCode(version=1, box_size=10, border=4)
-    qr.add_data(registration.qr_code_token)
-    qr.make(fit=True)
-    img = qr.make_image(fill_color="black", back_color="white")
-
-    buffer = io.BytesIO()
-    img.save(buffer, format="PNG")
-    buffer.seek(0)
-    qr_image_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
-
+    qr_image_base64 = generate_qr_base64(registration.qr_code_token)
     return {
         "qr_code": f"data:image/png;base64,{qr_image_base64}",
-        "qr_token": registration.qr_code_token
+        "qr_token": registration.qr_code_token,
     }
 
-
 @router.post("/{event_id}/verify-qr")
-def verify_qr(event_id: int, body: dict, db: Session = Depends(get_db), user=Depends(get_current_user)):
+def verify_qr(event_id: int, body: dict, db: DbSession, user: CurrentUser) -> dict:
     """
     Verifica un token QR la intrarea participantului la eveniment.
 
@@ -856,15 +773,12 @@ def verify_qr(event_id: int, body: dict, db: Session = Depends(get_db), user=Dep
         HTTPException 401: Daca utilizatorul nu este autentificat.
     """
     token = body.get("token")
-
     registration = db.query(models.EventRegistration).filter(
         models.EventRegistration.event_id == event_id,
-        models.EventRegistration.qr_code_token == token
+        models.EventRegistration.qr_code_token == token,
     ).first()
-
     if not registration:
         raise HTTPException(status_code=404, detail="QR invalid!")
-
     if registration.status == "attended":
         raise HTTPException(status_code=400, detail="QR deja folosit!")
 
@@ -872,12 +786,11 @@ def verify_qr(event_id: int, body: dict, db: Session = Depends(get_db), user=Dep
     registration.checked_in = True
     registration.checked_in_at = datetime.utcnow()
     db.commit()
-
     return {"valid": True, "message": "Intrare confirmată!"}
 
 
 @router.post("/{event_id}/sponsors")
-def add_sponsor(event_id: int, sponsor_data: SponsorCreate, db: Session = Depends(get_db)):
+def add_sponsor(event_id: int, sponsor_data: SponsorCreate, db: DbSession) -> dict:
     """
     Adauga un sponsor la un eveniment.
 
@@ -901,16 +814,15 @@ def add_sponsor(event_id: int, sponsor_data: SponsorCreate, db: Session = Depend
         event_id=event_id,
         name=sponsor_data.name,
         logo_path=sponsor_data.logo_url,
-        website_url=sponsor_data.website_url
+        website_url=sponsor_data.website_url,
     )
     db.add(sponsor)
     db.commit()
     db.refresh(sponsor)
     return {"message": "Sponsor adăugat!", "id": sponsor.id, "name": sponsor.name}
 
-
 @router.delete("/{event_id}/sponsors/{sponsor_id}")
-def delete_sponsor(event_id: int, sponsor_id: int, db: Session = Depends(get_db)):
+def delete_sponsor(event_id: int, sponsor_id: int, db: DbSession) -> dict:
     """
     Sterge un sponsor dintr-un eveniment dupa ID.
 
@@ -928,7 +840,7 @@ def delete_sponsor(event_id: int, sponsor_id: int, db: Session = Depends(get_db)
     """
     sponsor = db.query(models.EventSponsor).filter(
         models.EventSponsor.id == sponsor_id,
-        models.EventSponsor.event_id == event_id
+        models.EventSponsor.event_id == event_id,
     ).first()
     if not sponsor:
         raise HTTPException(status_code=404, detail="Sponsor negăsit")
@@ -939,10 +851,11 @@ def delete_sponsor(event_id: int, sponsor_id: int, db: Session = Depends(get_db)
 
 @router.post("/{event_id}/materials")
 def upload_materials(
-        event_id: int,
-        files: List[UploadFile] = File(...),
-        db: Session = Depends(get_db)
-):
+    event_id: int,
+    files: Annotated[List[UploadFile], File(...)],
+    db: DbSession,
+) -> dict:
+
     """
     Incarca unul sau mai multe fisiere ca materiale pentru un eveniment.
 
@@ -973,7 +886,6 @@ def upload_materials(
     for file in files:
         safe_name = sanitize_filename(file.filename)
         file_path = f"{upload_dir}/{safe_name}"
-
         with open(file_path, "wb") as f:
             shutil.copyfileobj(file.file, f)
 
@@ -986,7 +898,7 @@ def upload_materials(
             file_name=file.filename,
             file_type=ext,
             file_path=file_path,
-            file_size_kb=size_kb
+            file_size_kb=size_kb,
         )
         db.add(material)
         saved.append({"name": file.filename, "size_kb": size_kb, "type": ext})
@@ -994,9 +906,8 @@ def upload_materials(
     db.commit()
     return {"message": f"{len(saved)} fișiere încărcate!", "files": saved}
 
-
 @router.delete("/{event_id}/materials/{material_id}")
-def delete_material(event_id: int, material_id: int, db: Session = Depends(get_db)):
+def delete_material(event_id: int, material_id: int, db: DbSession) -> dict:
     """
     Sterge un material dintr-un eveniment si fisierul aferent de pe disk.
 
@@ -1014,21 +925,19 @@ def delete_material(event_id: int, material_id: int, db: Session = Depends(get_d
     """
     material = db.query(models.EventMaterial).filter(
         models.EventMaterial.id == material_id,
-        models.EventMaterial.event_id == event_id
+        models.EventMaterial.event_id == event_id,
     ).first()
     if not material:
         raise HTTPException(status_code=404, detail="Materialul negăsit")
-
     if os.path.exists(material.file_path):
         os.remove(material.file_path)
-
     db.delete(material)
     db.commit()
     return {"message": "Material șters!"}
 
 
 @router.get("/{event_id}/participants")
-def get_participants(event_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
+def get_participants(event_id: int, db: DbSession, user: CurrentUser) -> list:
     """
     Returneaza lista completa a participantilor la un eveniment.
 
@@ -1052,13 +961,8 @@ def get_participants(event_id: int, db: Session = Depends(get_db), user=Depends(
     event = db.query(models.Event).filter(models.Event.id == event_id).first()
     if not event:
         raise HTTPException(status_code=404, detail="Evenimentul nu există")
-
     if event.organizer_id != user["user_id"] and user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Acces interzis!")
-
-    registrations = db.query(models.EventRegistration).filter(
-        models.EventRegistration.event_id == event_id
-    ).all()
 
     return [
         {
@@ -1072,9 +976,10 @@ def get_participants(event_id: int, db: Session = Depends(get_db), user=Depends(
             "checked_in": r.checked_in,
             "checked_in_at": str(r.checked_in_at) if r.checked_in_at else None,
         }
-        for r in registrations
+        for r in db.query(models.EventRegistration).filter(
+            models.EventRegistration.event_id == event_id
+        ).all()
     ]
-
 
 def get_sentiment(feedbacks) -> dict:
     """

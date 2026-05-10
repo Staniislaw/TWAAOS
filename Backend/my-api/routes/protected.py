@@ -1,9 +1,10 @@
+from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status, Header
 from auth.jwt_handler import verify_token
 
 router = APIRouter()
 
-def get_current_user(authorization: str = Header(...)):
+def get_current_user(authorization: Annotated[str, Header()]) -> dict:
     if not authorization.startswith("Bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -18,10 +19,12 @@ def get_current_user(authorization: str = Header(...)):
         )
     return payload
 
+CurrentUser = Annotated[dict, Depends(get_current_user)]
+
 @router.get("/protected")
-def protected_route(user=Depends(get_current_user)):
+def protected_route(user: CurrentUser) -> dict:
     return {"message": "Acces permis!", "user": user}
 
 @router.get("/profile")
-def get_profile(user=Depends(get_current_user)):
+def get_profile(user: CurrentUser) -> dict:
     return {"message": "Profilul tau", "data": user}

@@ -1,54 +1,88 @@
+from typing import Annotated, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import func, extract
+from pydantic import BaseModel
 from database.database import get_db
 from database import models
 from auth.dependencies import get_current_user
-from pydantic import BaseModel
-from typing import Optional
-from sqlalchemy import func, extract
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
-def require_admin(user=Depends(get_current_user)):
-    print("USER PAYLOAD:", user)  # ← adaugă asta
+DbSession = Annotated[Session, Depends(get_db)]
+
+def require_admin(user: Annotated[dict, Depends(get_current_user)]) -> dict:
     if user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Acces restricționat!")
     return user
 
+AdminUser = Annotated[dict, Depends(require_admin)]
+
+class UpdateRoleBody(BaseModel):
+    role: str
+
+class EventDecision(BaseModel):
+    action: str
+    rejection_reason: Optional[str] = None
+
+def serialize_user(u: models.User) -> dict:
+    return {
+        "id": u.id,
+        "full_name": u.full_name,
+        "email": u.email,
+        "role": u.role,
+        "is_active": u.is_active,
+        "created_at": str(u.created_at),
+        "oauth_provider": u.oauth_provider,
+    }
+
+def serialize_event(e: models.Event) -> dict:
+    return {
+        "id": e.id,
+        "title": e.title,
+        "description": e.description,
+        "category": e.category,
+        "faculty": e.faculty,
+        "start_datetime": str(e.start_datetime),
+        "end_datetime": str(e.end_datetime) if e.end_datetime else None,
+        "location": e.location,
+        "participation_mode": e.participation_mode,
+        "entry_type": e.entry_type,
+        "max_participants": e.max_participants,
+        "status": e.status,
+        "rejection_reason": getattr(e, "rejection_reason", None),
+        "created_at": str(e.created_at),
+        "organizer_name": e.organizer.full_name if e.organizer else "Necunoscut",
+        "organizer_id": e.organizer_id,
+    }
+
 # ============ USERI ============
 
 @router.get("/users")
-def get_all_users(db: Session = Depends(get_db), user=Depends(require_admin)):
-    users = db.query(models.User).all()
-    return [
-        {
-            "id": u.id,
-            "full_name": u.full_name,
-            "email": u.email,
-            "role": u.role,
-            "is_active": u.is_active,
-            "created_at": str(u.created_at),
-            "oauth_provider": u.oauth_provider,
-        }
-        for u in users
-    ]
+def get_all_users(db: DbSession, user: AdminUser) -> list[dict]:
+    return [serialize_user(u) for u in db.query(models.User).all()]
 
 @router.put("/users/{user_id}/role")
-def update_user_role(user_id: int, body: dict, db: Session = Depends(get_db), user=Depends(require_admin)):
-    new_role = body.get("role")
-    if new_role not in ["student", "organizer", "admin"]:
+def update_user_role(
+    user_id: int,
+    body: UpdateRoleBody,
+    db: DbSession,
+    user: AdminUser,
+) -> dict:
+    valid_roles = {"student", "organizer", "admin"}
+    if body.role not in valid_roles:
         raise HTTPException(status_code=400, detail="Rol invalid!")
 
     db_user = db.query(models.User).filter(models.User.id == user_id).first()
     if not db_user:
         raise HTTPException(status_code=404, detail="Userul nu există!")
 
-    db_user.role = new_role
+    db_user.role = body.role
     db.commit()
-    return {"message": f"Rol actualizat la {new_role}!", "user_id": user_id}
+    return {"message": f"Rol actualizat la {body.role}!", "user_id": user_id}
 
 @router.put("/users/{user_id}/toggle-active")
-def toggle_user_active(user_id: int, db: Session = Depends(get_db), user=Depends(require_admin)):
+def toggle_user_active(user_id: int, db: DbSession, user: AdminUser) -> dict:
     db_user = db.query(models.User).filter(models.User.id == user_id).first()
     if not db_user:
         raise HTTPException(status_code=404, detail="Userul nu există!")
@@ -59,36 +93,25 @@ def toggle_user_active(user_id: int, db: Session = Depends(get_db), user=Depends
 
 # ============ EVENIMENTE ============
 
-class EventDecision(BaseModel):
-    action: str  # "approve" sau "reject"
-    rejection_reason: Optional[str] = None
+VALID_STATUSES = {"pending", "active", "rejected"}
 
 @router.get("/events/pending")
-def get_pending_events(db: Session = Depends(get_db), user=Depends(require_admin)):
+def get_pending_events(db: DbSession, user: AdminUser) -> list[dict]:
     events = db.query(models.Event).filter(models.Event.status == "pending").all()
-    return [
-        {
-            "id": e.id,
-            "title": e.title,
-            "description": e.description,
-            "category": e.category,
-            "faculty": e.faculty,
-            "start_datetime": str(e.start_datetime),
-            "end_datetime": str(e.end_datetime) if e.end_datetime else None,
-            "location": e.location,
-            "participation_mode": e.participation_mode,
-            "entry_type": e.entry_type,
-            "max_participants": e.max_participants,
-            "status": e.status,
-            "created_at": str(e.created_at),
-            "organizer_name": e.organizer.full_name if e.organizer else "Necunoscut",
-            "organizer_id": e.organizer_id,
-        }
-        for e in events
-    ]
+    return [serialize_event(e) for e in events]
+
+@router.get("/events/rejected")
+def get_rejected_events(db: DbSession, user: AdminUser) -> list[dict]:
+    events = db.query(models.Event).filter(models.Event.status == "rejected").all()
+    return [serialize_event(e) for e in events]
 
 @router.put("/events/{event_id}/decision")
-def decide_event(event_id: int, decision: EventDecision, db: Session = Depends(get_db), user=Depends(require_admin)):
+def decide_event(
+    event_id: int,
+    decision: EventDecision,
+    db: DbSession,
+    user: AdminUser,
+) -> dict:
     event = db.query(models.Event).filter(models.Event.id == event_id).first()
     if not event:
         raise HTTPException(status_code=404, detail="Evenimentul nu există!")
@@ -105,82 +128,55 @@ def decide_event(event_id: int, decision: EventDecision, db: Session = Depends(g
         raise HTTPException(status_code=400, detail="Acțiune invalidă!")
 
     db.commit()
-    return {"message": f"Eveniment {'aprobat' if decision.action == 'approve' else 'respins'}!"}
+    label = "aprobat" if decision.action == "approve" else "respins"
+    return {"message": f"Eveniment {label}!"}
 
-# routes/admin.py
+# ============ RAPOARTE ============
 
-@router.get("/events/rejected")
-def get_rejected_events(db: Session = Depends(get_db), user=Depends(require_admin)):
-    events = db.query(models.Event).filter(models.Event.status == "rejected").all()
-    return [
-        {
-            "id": e.id,
-            "title": e.title,
-            "description": e.description,
-            "category": e.category,
-            "faculty": e.faculty,
-            "start_datetime": str(e.start_datetime),
-            "end_datetime": str(e.end_datetime) if e.end_datetime else None,
-            "location": e.location,
-            "participation_mode": e.participation_mode,
-            "entry_type": e.entry_type,
-            "max_participants": e.max_participants,
-            "status": e.status,
-            "rejection_reason": e.rejection_reason,
-            "created_at": str(e.created_at),
-            "organizer_name": e.organizer.full_name if e.organizer else "Necunoscut",
-            "organizer_id": e.organizer_id,
-        }
-        for e in events
-    ]
 @router.get("/reports")
-def get_reports(db: Session = Depends(get_db), user=Depends(require_admin)):
-
-    # 1. Evenimente pe lună (ultimele 12 luni)
+def get_reports(db: DbSession, user: AdminUser) -> dict:
     events_per_month = db.query(
-        extract('year', models.Event.created_at).label('year'),
-        extract('month', models.Event.created_at).label('month'),
-        func.count(models.Event.id).label('count')
-    ).group_by('year', 'month').order_by('year', 'month').all()
+        extract("year", models.Event.created_at).label("year"),
+        extract("month", models.Event.created_at).label("month"),
+        func.count(models.Event.id).label("count"),
+    ).group_by("year", "month").order_by("year", "month").all()
 
-    # 2. Participare medie per eveniment
     avg_participation = db.query(
         func.avg(
             db.query(func.count(models.EventRegistration.id))
             .filter(models.EventRegistration.event_id == models.Event.id)
-            .filter(models.EventRegistration.status == 'registered')
+            .filter(models.EventRegistration.status == "registered")
             .correlate(models.Event)
             .scalar_subquery()
         )
     ).scalar()
 
-    # 3. Evenimente per organizator
-    events_per_organizer = db.query(
-        models.User.full_name,
-        models.User.email,
-        func.count(models.Event.id).label('count')
-    ).join(models.Event, models.Event.organizer_id == models.User.id)\
-     .group_by(models.User.id)\
-     .order_by(func.count(models.Event.id).desc())\
-     .all()
+    events_per_organizer = (
+        db.query(
+            models.User.full_name,
+            models.User.email,
+            func.count(models.Event.id).label("count"),
+        )
+        .join(models.Event, models.Event.organizer_id == models.User.id)
+        .group_by(models.User.id)
+        .order_by(func.count(models.Event.id).desc())
+        .all()
+    )
 
-    # 4. Statistici generale
-    total_events = db.query(func.count(models.Event.id)).scalar()
-    total_users = db.query(func.count(models.User.id)).scalar()
+    total_events        = db.query(func.count(models.Event.id)).scalar()
+    total_users         = db.query(func.count(models.User.id)).scalar()
     total_registrations = db.query(func.count(models.EventRegistration.id)).scalar()
-    total_feedback = db.query(func.count(models.EventFeedback.id)).scalar()
-    avg_rating = db.query(func.avg(models.EventFeedback.rating)).scalar()
+    total_feedback      = db.query(func.count(models.EventFeedback.id)).scalar()
+    avg_rating          = db.query(func.avg(models.EventFeedback.rating)).scalar()
 
-    # 5. Evenimente pe categorie
     events_per_category = db.query(
         models.Event.category,
-        func.count(models.Event.id).label('count')
+        func.count(models.Event.id).label("count"),
     ).group_by(models.Event.category).all()
 
-    # 6. Evenimente pe status
     events_per_status = db.query(
         models.Event.status,
-        func.count(models.Event.id).label('count')
+        func.count(models.Event.id).label("count"),
     ).group_by(models.Event.status).all()
 
     return {
@@ -207,5 +203,5 @@ def get_reports(db: Session = Depends(get_db), user=Depends(require_admin)):
         "events_per_status": [
             {"status": r.status, "count": r.count}
             for r in events_per_status
-        ]
+        ],
     }

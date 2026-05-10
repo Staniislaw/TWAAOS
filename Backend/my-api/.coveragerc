@@ -1,0 +1,20 @@
+[run]
+source = .
+omit =
+    .venv/*
+    tests/*
+    */__pycache__/*
+    services/email_service.py
+    main.py
+    auth/google_auth.py
+    database/database.py
+
+[report]
+omit =
+    .venv/*
+    tests/*
+    */__pycache__/*
+    services/email_service.py
+    main.py
+    auth/google_auth.py
+    database/database.py
