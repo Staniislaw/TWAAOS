@@ -1,0 +1,6 @@
+projectKey=Isa-twaoos
+serverUrl=http://localhost:9000
+serverVersion=26.4.0.121862
+dashboardUrl=http://localhost:9000/dashboard?id=Isa-twaoos
+ceTaskId=c3681b84-83f7-4785-8420-3b9dc1ddfef1
+ceTaskUrl=http://localhost:9000/api/ce/task?id=c3681b84-83f7-4785-8420-3b9dc1ddfef1

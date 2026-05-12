@@ -1,0 +1,32 @@
+site_name: Documentatie Backend API
+site_description: Documentatie completa pentru aplicatia backend FastAPI
+site_author: Team Backend
+
+theme:
+  name: material
+  language: ro
+  palette:
+    primary: indigo
+    accent: indigo
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - content.code.copy
+
+nav:
+  - Acasa: index.md
+  - Autentificare:
+      - Prezentare generala: auth/overview.md
+      - Endpoints: auth/endpoints.md
+  - API:
+      - Evenimente: api/events.md
+      - Utilizatori: api/users.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables

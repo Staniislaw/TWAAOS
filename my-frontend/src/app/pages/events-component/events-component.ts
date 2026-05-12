@@ -6,11 +6,12 @@ import { Event } from '../../models/event.model';
 import { SidebarComponent } from '../../layout/sidebar-component/sidebar-component';
 import { EventService } from '../../services/event-service';
 import { AuthService } from '../../services/auth';
+import {MatIconModule} from '@angular/material/icon';
 
 @Component({
   selector: 'app-events-component',
   standalone: true,
-  imports: [CommonModule, FormsModule, SidebarComponent],
+  imports: [CommonModule, FormsModule, SidebarComponent,MatIconModule],
   templateUrl: './events-component.html',
   styleUrl: './events-component.css',
 })

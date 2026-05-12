@@ -1,184 +1,215 @@
+<!-- events-explorer.component.html -->
 <div class="page-wrapper">
 
   <!-- SIDEBAR -->
-   <app-sidebar-component></app-sidebar-component>
+  <app-sidebar-component></app-sidebar-component>
 
   <!-- MAIN -->
   <main class="main-content">
 
+    <!-- Ambient background -->
+    <div class="bg-mesh"></div>
+    <div class="bg-orb orb-1"></div>
+    <div class="bg-orb orb-2"></div>
+    <div class="bg-orb orb-3"></div>
+
     <!-- Header -->
     <div class="page-header">
-      <div>
-        <h1>Academic <span class="highlight">Events Explorer</span></h1>
+      <div class="header-title">
+        <span class="page-label">PLATFORMĂ ACADEMICĂ</span>
+        <h1>Events <span class="highlight">Explorer</span></h1>
       </div>
       <div class="header-actions">
         <button
-          class="btn-my-events"
+          class="btn-glass btn-my-events"
           *ngIf="isOrganizer"
           [class.active]="showMyEvents"
           (click)="toggleMyEvents()"
         >
-          📋 {{ showMyEvents ? 'Toate evenimentele' : 'Evenimentele mele' }}
+          <mat-icon>event_note</mat-icon>
+          {{ showMyEvents ? 'Toate evenimentele' : 'Evenimentele mele' }}
         </button>
-        <button class="btn-secondary" (click)="toggleSort()">
-          {{ sortOrder === 'newest' ? '↕ Recent adăugate' : '↕ Cele mai vechi' }}
+        <button class="btn-glass" (click)="toggleSort()">
+          <mat-icon>swap_vert</mat-icon>
+          {{ sortOrder === 'newest' ? 'Recent adăugate' : 'Cele mai vechi' }}
         </button>
       </div>
     </div>
 
     <!-- Filters -->
-    <div class="filters-bar">
-      <!-- Categorie -->
-      <div class="filter-group">
-        <label>CATEGORIE</label>
-        <select [(ngModel)]="selectedCategory" (change)="applyFilters()">
-          <option value="">Toate categoriile</option>
-          <option *ngFor="let cat of availableCategories" [value]="cat">{{ cat }}</option>
-        </select>
-      </div>
+    <!-- Filters -->
+<div class="filters-glass-bar">
 
-      <!-- Facultate -->
-      <div class="filter-group">
-        <label>FACULTATE</label>
-        <select [(ngModel)]="selectedFaculty" (change)="applyFilters()">
-          <option value="">Toate</option>
-          <option *ngFor="let fac of availableFaculties" [value]="fac">{{ fac }}</option>
-        </select>
-      </div>
+  <div class="filter-chip">
+    <span class="material-icons chip-icon">category</span>
+    <select [(ngModel)]="selectedCategory" (change)="applyFilters()">
+      <option value="">Categorie</option>
+      <option *ngFor="let cat of availableCategories" [value]="cat">{{ cat }}</option>
+    </select>
+  </div>
 
-      <!-- Mod participare -->
-      <div class="filter-group">
-        <label>MOD</label>
-        <select [(ngModel)]="selectedMode" (change)="applyFilters()">
-          <option value="">Toate</option>
-          <option value="In-Person">📍 In-Person</option>
-          <option value="Online">💻 Online</option>
-          <option value="Hybrid">🔄 Hybrid</option>
-        </select>
-      </div>
+  <div class="filter-chip">
+    <span class="material-icons chip-icon">school</span>
+    <select [(ngModel)]="selectedFaculty" (change)="applyFilters()">
+      <option value="">Facultate</option>
+      <option *ngFor="let fac of availableFaculties" [value]="fac">{{ fac }}</option>
+    </select>
+  </div>
 
-      <!-- Status -->
-      <div class="filter-group">
-        <label>STATUS</label>
-        <select [(ngModel)]="selectedStatus" (change)="applyFilters()">
-          <option value="">Toate</option>
-          <option value="active">Deschis</option>
-          <option value="closing_soon">Se închide curând</option>
-          <option value="closed">Închis</option>
-        </select>
-      </div>
+  <div class="filter-chip">
+    <span class="material-icons chip-icon">devices</span>
+    <select [(ngModel)]="selectedMode" (change)="applyFilters()">
+      <option value="">Mod</option>
+      <option value="In-Person">In-Person</option>
+      <option value="Online">Online</option>
+      <option value="Hybrid">Hybrid</option>
+    </select>
+  </div>
 
-      <!-- Organizator -->
-      <div class="filter-group">
-        <label>ORGANIZATOR</label>
-        <select [(ngModel)]="selectedOrganizer" (change)="applyFilters()">
-          <option value="">Toți organizatorii</option>
-          <option *ngFor="let org of availableOrganizers" [value]="org">{{ org }}</option>
-        </select>
-      </div>
+  <div class="filter-chip">
+    <span class="material-icons chip-icon">toggle_on</span>
+    <select [(ngModel)]="selectedStatus" (change)="applyFilters()">
+      <option value="">Status</option>
+      <option value="active">Deschis</option>
+      <option value="closing_soon">Se închide curând</option>
+      <option value="closed">Închis</option>
+    </select>
+  </div>
 
-      <!-- Locatie -->
-      <div class="filter-group">
-        <label>LOCAȚIE</label>
-        <select [(ngModel)]="selectedLocation" (change)="applyFilters()">
-          <option value="">Toate locațiile</option>
-          <option *ngFor="let loc of availableLocations" [value]="loc">{{ loc }}</option>
-        </select>
-      </div>
+  <div class="filter-chip">
+    <span class="material-icons chip-icon">person</span>
+    <select [(ngModel)]="selectedOrganizer" (change)="applyFilters()">
+      <option value="">Organizator</option>
+      <option *ngFor="let org of availableOrganizers" [value]="org">{{ org }}</option>
+    </select>
+  </div>
 
-      <!-- Entry Type -->
-      <div class="filter-group">
-        <label>INTRARE</label>
-        <select [(ngModel)]="selectedEntryType" (change)="applyFilters()">
-          <option value="">Toate</option>
-          <option value="free">🟢 Intrare liberă</option>
-          <option value="registration">📝 Necesită înscriere</option>
-          <option value="qr_code">🎫 Bilet QR</option>
-        </select>
-      </div>
+  <div class="filter-chip">
+    <span class="material-icons chip-icon">location_on</span>
+    <select [(ngModel)]="selectedLocation" (change)="applyFilters()">
+      <option value="">Locație</option>
+      <option *ngFor="let loc of availableLocations" [value]="loc">{{ loc }}</option>
+    </select>
+  </div>
 
-      <!-- Data de la -->
-      <div class="filter-group">
-        <label>DE LA DATA</label>
-        <input type="date" [(ngModel)]="searchDateFrom" (change)="applyFilters()" />
-      </div>
+  <div class="filter-chip">
+    <span class="material-icons chip-icon">confirmation_number</span>
+    <select [(ngModel)]="selectedEntryType" (change)="applyFilters()">
+      <option value="">Intrare</option>
+      <option value="free">Liberă</option>
+      <option value="registration">Înscriere</option>
+      <option value="qr_code">Bilet QR</option>
+    </select>
+  </div>
 
-      <!-- Data până la -->
-      <div class="filter-group">
-        <label>PÂNĂ LA DATA</label>
-        <input type="date" [(ngModel)]="searchDateTo" (change)="applyFilters()" />
-      </div>
+  <div class="filter-chip filter-chip--date">
+    <span class="material-icons chip-icon">calendar_today</span>
+    <input type="date" [(ngModel)]="searchDateFrom" (change)="applyFilters()" />
+  </div>
 
-      <!-- Reset -->
-      <div class="filter-group">
-        <label>&nbsp;</label>
-        <button class="btn-secondary" (click)="resetFilters()">✖ Reset filtre</button>
-      </div>
+  <div class="filter-chip filter-chip--date">
+    <span class="material-icons chip-icon">event</span>
+    <input type="date" [(ngModel)]="searchDateTo" (change)="applyFilters()" />
+  </div>
 
-    </div>
+  <button class="btn-reset-glass" (click)="resetFilters()">
+    <span class="material-icons">filter_alt_off</span>
+    Reset
+  </button>
+
+</div>
 
     <!-- Loading -->
-    <div class="loading" *ngIf="isLoading">
-      <div class="spinner"></div>
+    <div class="loading-glass" *ngIf="isLoading">
+      <div class="spinner-ring"></div>
       <p>Se încarcă evenimentele...</p>
     </div>
 
     <!-- Events Grid -->
     <div class="events-grid" *ngIf="!isLoading">
-      <!-- Card normal -->
+
       <div
         class="event-card"
         *ngFor="let event of paginatedEvents; let i = index"
         [class.featured]="i === 3"
         [class.card-rejected]="event.status === 'rejected'"
         [class.card-pending]="event.status === 'pending'"
-        (click)="goToEvent(event.id)">
+        (click)="goToEvent(event.id)"
+      >
         <!-- Card Cover -->
-        <div class="card-cover">
-          <div class="cover-gradient" [style.background]="'linear-gradient(135deg, ' + getCoverColor(event.category || 'unknown') + ')'">
-            <span class="cover-emoji">{{ getCategoryEmoji(event.category || 'unknown') }}</span>
-          </div>
+        <div class="card-cover" [style.background]="'linear-gradient(135deg, ' + getCoverColor(event.category || 'unknown') + ')'">
+          <!-- Category Icon using Material Icons -->
+          <span class="cover-mat-icon material-icons">{{  'unknown' }}</span>
+
           <span class="category-badge">{{ event.category }}</span>
-          <div class="sentiment-badge-cover"
+
+          <div class="sentiment-pill"
             *ngIf="event.sentiment && event.feedback_count && event.feedback_count > 0"
             [ngClass]="'sentiment-' + event.sentiment.color">
-            {{ event.sentiment.emoji }} {{ event.sentiment.label }}
+            <span class="material-icons sentiment-icon">{{'unknown' }}</span>
+            {{ event.sentiment.label }}
           </div>
         </div>
 
         <!-- Card Body -->
         <div class="card-body">
+
           <div class="card-meta">
-            <span>🕐 {{ formatDate(event.start_datetime) }}</span>
-            <span>{{ getModeIcon(event.participation_mode || 'unknown') }} {{ event.location }}</span>
+            <span class="meta-chip">
+              <span class="material-icons meta-icon">schedule</span>
+              {{ formatDate(event.start_datetime) }}
+            </span>
+            <span class="meta-chip">
+              <span class="material-icons meta-icon">{{  'unknown' }}</span>
+              {{ event.location }}
+            </span>
           </div>
 
           <h3 class="card-title">{{ event.title }}</h3>
           <p class="card-description">{{ event.description }}</p>
 
-          <div class="rejected-banner" *ngIf="event.status === 'rejected'">
-            <span class="rejected-label">❌ Respins</span>
-            <span class="rejected-reason">{{ event.rejection_reason }}</span>
+          <!-- Rejected banner -->
+          <div class="status-banner banner-rejected" *ngIf="event.status === 'rejected'">
+            <span class="material-icons banner-icon">cancel</span>
+            <div>
+              <span class="banner-label">Respins</span>
+              <span class="banner-reason">{{ event.rejection_reason }}</span>
+            </div>
           </div>
 
-          <!-- Badge pending -->
-          <div class="pending-banner" *ngIf="event.status === 'pending'">
-            ⏳ În așteptarea aprobării
+          <!-- Pending banner -->
+          <div class="status-banner banner-pending" *ngIf="event.status === 'pending'">
+            <span class="material-icons banner-icon">hourglass_top</span>
+            <span>În așteptarea aprobării</span>
           </div>
 
           <div class="card-tags" *ngIf="event.status !== 'rejected' && event.status !== 'pending'">
-            <span class="tag tag-faculty">{{ event.faculty }}</span>
-            <span class="tag tag-mode">{{ event.participation_mode }}</span>
+            <span class="tag tag-faculty">
+              <span class="material-icons tag-icon">school</span>
+              {{ event.faculty }}
+            </span>
+            <span class="tag tag-mode">
+              <span class="material-icons tag-icon">{{  'unknown' }}</span>
+              {{ event.participation_mode }}
+            </span>
             <span class="tag" [ngClass]="getEntryTypeClass(event.entry_type)">
+              <span class="material-icons tag-icon">{{  'unknown' }}</span>
               {{ getEntryTypeLabel(event.entry_type) }}
             </span>
-            <span class="tag" [class.tag-open]="event.status === 'active'"
+            <span class="tag"
+              [class.tag-open]="event.status === 'active'"
               [class.tag-closing]="event.status === 'closing_soon'">
+              <span class="material-icons tag-icon">{{ event.status === 'active' ? 'check_circle' : 'timer' }}</span>
               {{ getStatusLabel(event.status) }}
             </span>
           </div>
+
+          <!-- Sponsors -->
           <div class="card-sponsors" *ngIf="event.sponsors && event.sponsors.length > 0">
-            <small class="sponsors-label">Sponsori</small>
+            <small class="sponsors-label">
+              <span class="material-icons sponsors-label-icon">handshake</span>
+              Sponsori
+            </small>
             <div class="sponsors-row">
               <div class="sponsor-chip" *ngFor="let sponsor of event.sponsors">
                 <img *ngIf="sponsor.logo_path" [src]="sponsor.logo_path" [alt]="sponsor.name"
@@ -189,62 +220,90 @@
             </div>
           </div>
 
+          <!-- Actions -->
           <div class="card-actions">
             <ng-container *ngIf="isMyEvent(event)">
-              <button class="btn-edit" (click)="editEvent(event.id); $event.stopPropagation()">✏️ Editează</button>
-              <button class="btn-delete" (click)="deleteEvent(event.id); $event.stopPropagation()">🗑️ Șterge</button>
+              <button class="btn-action btn-edit" (click)="editEvent(event.id); $event.stopPropagation()">
+                <span class="material-icons">edit</span> Editează
+              </button>
+              <button class="btn-action btn-delete" (click)="deleteEvent(event.id); $event.stopPropagation()">
+                <span class="material-icons">delete</span> Șterge
+              </button>
             </ng-container>
             <ng-container *ngIf="!isMyEvent(event)">
               <button
-                class="btn-register"
+                class="btn-action btn-register"
                 [class.registered]="isRegistered(event.id)"
                 [disabled]="isRegistered(event.id)"
                 (click)="register(event.id); $event.stopPropagation()"
               >
-                {{ isRegistered(event.id) ? 'Deja înscris' : 'Înregistrează-te' }}
+                <span class="material-icons">{{ isRegistered(event.id) ? 'how_to_reg' : 'app_registration' }}</span>
+                {{ isRegistered(event.id) ? 'Înscris' : 'Înregistrează-te' }}
               </button>
             </ng-container>
-
-            <button class="btn-details" (click)="goToEvent(event.id); $event.stopPropagation()">Vezi detalii</button>
+            <button class="btn-action btn-details" (click)="goToEvent(event.id); $event.stopPropagation()">
+              <span class="material-icons">open_in_new</span> Detalii
+            </button>
           </div>
         </div>
       </div>
+
       <div class="no-results" *ngIf="!isLoading && filteredEvents.length === 0">
-        <p>Niciun eveniment gasit pentru filtrele selectate.</p>
+        <span class="material-icons no-results-icon">search_off</span>
+        <p>Niciun eveniment găsit pentru filtrele selectate.</p>
       </div>
     </div>
 
     <!-- Pagination -->
     <div class="pagination" *ngIf="!isLoading && totalPages > 1">
-      <button class="page-btn" (click)="goToPage(currentPage - 1)" [disabled]="currentPage === 1">‹</button>
-      <button class="page-btn"*ngFor="let page of pageNumbers"[class.active]="page === currentPage"(click)="goToPage(page)">
-        {{ page }}
+      <button class="page-btn" (click)="goToPage(currentPage - 1)" [disabled]="currentPage === 1">
+        <span class="material-icons">chevron_left</span>
       </button>
-      <button class="page-btn" (click)="goToPage(currentPage + 1)" [disabled]="currentPage === totalPages">›</button>
+      <button
+        class="page-btn"
+        *ngFor="let page of pageNumbers"
+        [class.active]="page === currentPage"
+        (click)="goToPage(page)"
+      >{{ page }}</button>
+      <button class="page-btn" (click)="goToPage(currentPage + 1)" [disabled]="currentPage === totalPages">
+        <span class="material-icons">chevron_right</span>
+      </button>
     </div>
+
   </main>
 </div>
 
 <!-- Modal QR Code -->
-<div class="qr-modal-overlay" *ngIf="showQrModal" (click)="closeQrModal()">
-  <div class="qr-modal" (click)="$event.stopPropagation()">
-    <h3>🎫 Biletul tău QR</h3>
-    <p>Prezintă acest cod la intrare</p>
-    <img [src]="qrCodeImage" alt="QR Code" />
-    <small>Token: {{ qrToken }}</small>
-    <button (click)="closeQrModal()">Închide</button>
+<div class="modal-overlay" *ngIf="showQrModal" (click)="closeQrModal()">
+  <div class="modal-glass" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <span class="material-icons modal-header-icon">qr_code_2</span>
+      <h3>Biletul tău QR</h3>
+    </div>
+    <p class="modal-subtitle">Prezintă acest cod la intrare</p>
+    <img [src]="qrCodeImage" alt="QR Code" class="qr-img" />
+    <small class="qr-token">Token: {{ qrToken }}</small>
+    <button class="btn-modal-close" (click)="closeQrModal()">
+      <span class="material-icons">close</span> Închide
+    </button>
   </div>
 </div>
 
-<!-- Modal confirmare stergere -->
-<div class="confirm-overlay" *ngIf="showDeleteConfirm" (click)="cancelDelete()">
-  <div class="confirm-dialog" (click)="$event.stopPropagation()">
-    <div class="confirm-icon">🗑️</div>
+<!-- Modal confirmare ștergere -->
+<div class="modal-overlay" *ngIf="showDeleteConfirm" (click)="cancelDelete()">
+  <div class="modal-glass modal-confirm" (click)="$event.stopPropagation()">
+    <div class="confirm-icon-wrap">
+      <span class="material-icons confirm-icon">delete_forever</span>
+    </div>
     <h3>Ștergi evenimentul?</h3>
     <p>Această acțiune este ireversibilă. Evenimentul și toate datele asociate vor fi șterse permanent.</p>
     <div class="confirm-actions">
-      <button class="btn-cancel" (click)="cancelDelete()">Anulează</button>
-      <button class="btn-confirm-delete" (click)="confirmDelete()">Da, șterge</button>
+      <button class="btn-action btn-cancel-action" (click)="cancelDelete()">
+        <span class="material-icons">close</span> Anulează
+      </button>
+      <button class="btn-action btn-confirm-delete" (click)="confirmDelete()">
+        <span class="material-icons">delete_forever</span> Da, șterge
+      </button>
     </div>
   </div>
 </div>

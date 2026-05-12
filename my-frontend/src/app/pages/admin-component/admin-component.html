@@ -1,0 +1,374 @@
+<!-- admin-component.html -->
+<div class="page-wrapper">
+  <app-sidebar-component></app-sidebar-component>
+
+  <main class="main-content">
+
+    <!-- Header -->
+    <div class="page-header">
+      <div>
+        <span class="page-label">PANOU ADMINISTRARE</span>
+        <h1>Admin <span class="highlight">Dashboard</span></h1>
+      </div>
+      <div class="header-stats">
+        <div class="stat-chip">
+          👥 {{ users.length }} utilizatori
+        </div>
+        <div class="stat-chip stat-pending">
+          ⏳ {{ pendingEvents.length }} în așteptare
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+        <button class="tab" [class.active]="activeTab === 'users'" (click)="activeTab = 'users'">
+            👥 Utilizatori
+        </button>
+        <button class="tab" [class.active]="activeTab === 'events'" (click)="activeTab = 'events'">
+          📋 Evenimente în așteptare
+         <span class="badge" *ngIf="pendingEvents.length > 0">{{ pendingEvents.length }}</span>
+        </button>
+        <button class="tab" [class.active]="activeTab === 'rejected'" (click)="activeTab = 'rejected'">
+            ❌ Evenimente Respinse
+          <span class="badge badge-red" *ngIf="rejectedEvents.length > 0">{{ rejectedEvents.length }}</span>
+        </button>
+        <button class="tab" [class.active]="activeTab === 'reports'" (click)="activeTab = 'reports'">
+            📊 Rapoarte
+        </button>
+    </div>
+
+    <!-- TAB USERS -->
+    <div *ngIf="activeTab === 'users'">
+      <div class="search-bar">
+        <input
+          type="text"
+          [(ngModel)]="searchUser"
+          (input)="searchUsers()"
+          placeholder="🔍 Caută după nume sau email..."
+        />
+      </div>
+
+      <div class="loading" *ngIf="isLoadingUsers">
+        <div class="spinner"></div>
+      </div>
+
+      <div class="users-table-wrap" *ngIf="!isLoadingUsers">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Utilizator</th>
+              <th>Email</th>
+              <th>Provider</th>
+              <th>Rol</th>
+              <th>Status</th>
+              <th>Acțiuni</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let user of filteredUsers; let i = index">
+              <td class="td-index">{{ i + 1 }}</td>
+              <td class="td-name">
+                <div class="user-avatar">{{ user.full_name ? user.full_name[0] : '?' }}</div>
+                {{ user.full_name || '—' }}
+              </td>
+              <td class="td-email">{{ user.email }}</td>
+              <td>
+                <span class="provider-badge">{{ user.oauth_provider || 'email' }}</span>
+              </td>
+              <td>
+                <span class="role-badge" [ngClass]="getRoleClass(user.role)">
+                  {{ user.role }}
+                </span>
+              </td>
+              <td>
+                <span class="active-badge" [class.inactive]="!user.is_active">
+                  {{ user.is_active ? '✅ Activ' : '❌ Inactiv' }}
+                </span>
+              </td>
+              <td class="td-actions">
+                <select class="role-select" [value]="user.role" (change)="updateRole(user.id, $any($event.target).value)">
+                  <option value="student">Student</option>
+                  <option value="organizer">Organizer</option>
+                  <option value="admin">Admin</option>
+                </select>
+                <button class="btn-toggle"
+                  [class.deactivate]="user.is_active"
+                  (click)="toggleActive(user.id)">
+                  {{ user.is_active ? 'Dezactivează' : 'Activează' }}
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB EVENTS -->
+    <div *ngIf="activeTab === 'events'">
+      <div class="loading" *ngIf="isLoadingEvents">
+        <div class="spinner"></div>
+      </div>
+
+      <div class="no-results" *ngIf="!isLoadingEvents && pendingEvents.length === 0">
+        <p>✅ Nu există evenimente în așteptare!</p>
+      </div>
+
+      <div class="pending-grid" *ngIf="!isLoadingEvents">
+        <div class="pending-card" *ngFor="let event of pendingEvents" (click)="openPreview(event)">
+          <div class="pending-card-header">
+            <span class="pending-badge">⏳ În așteptare</span>
+            <small>{{ formatDate(event.created_at) }}</small>
+          </div>
+          <h3>{{ event.title }}</h3>
+          <p>{{ event.description }}</p>
+          <div class="pending-meta">
+            <span>📅 {{ formatDate(event.start_datetime) }}</span>
+            <span>📍 {{ event.location }}</span>
+            <span>👤 {{ event.organizer_name }}</span>
+          </div>
+          <div class="pending-actions" (click)="$event.stopPropagation()">
+            <button class="btn-approve" (click)="approveEvent(event.id)">✅ Aprobă</button>
+            <button class="btn-reject" (click)="openRejectDialog(event.id)">❌ Respinge</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div *ngIf="activeTab === 'rejected'">
+        <div class="loading" *ngIf="isLoadingRejected">
+        <div class="spinner"></div>
+        </div>
+        <div class="no-results" *ngIf="!isLoadingRejected && rejectedEvents.length === 0">
+        <p>✅ Nu există evenimente respinse!</p>
+        </div>
+
+        <div class="pending-grid" *ngIf="!isLoadingRejected && rejectedEvents.length > 0">
+        <div class="pending-card rejected-card" *ngFor="let event of rejectedEvents"
+            (click)="openPreview(event)">
+            <div class="pending-card-header">
+            <span class="rejected-badge">❌ Respins</span>
+            <small>{{ formatDate(event.created_at) }}</small>
+            </div>
+            <h3>{{ event.title }}</h3>
+            <p>{{ event.description }}</p>
+            <div class="rejection-reason-box">
+            <small>Motiv respingere:</small>
+            <p>{{ event.rejection_reason }}</p>
+            </div>
+            <div class="pending-meta">
+            <span>📅 {{ formatDate(event.start_datetime) }}</span>
+            <span>📍 {{ event.location }}</span>
+            <span>👤 {{ event.organizer_name }}</span>
+            </div>
+            <div class="pending-actions" (click)="$event.stopPropagation()">
+            <button class="btn-approve" (click)="approveFromRejected(event.id)">
+                ✅ Aprobă totuși
+            </button>
+            </div>
+        </div>
+        </div>
+    </div>
+
+    <!-- TAB REPORTS -->
+<div *ngIf="activeTab === 'reports'">
+
+  <div class="loading" *ngIf="isLoadingReports">
+    <div class="spinner"></div>
+  </div>
+
+  <div *ngIf="!isLoadingReports && reports">
+
+        <!-- Statistici generale -->
+        <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon">📅</div>
+            <div class="stat-value">{{ reports.general.total_events }}</div>
+            <div class="stat-label">Total evenimente</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">👥</div>
+            <div class="stat-value">{{ reports.general.total_users }}</div>
+            <div class="stat-label">Total utilizatori</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">📋</div>
+            <div class="stat-value">{{ reports.general.total_registrations }}</div>
+            <div class="stat-label">Total înregistrări</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">⭐</div>
+            <div class="stat-value">{{ reports.general.avg_rating }}/5</div>
+            <div class="stat-label">Rating mediu</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">👤</div>
+            <div class="stat-value">{{ reports.general.avg_participation }}</div>
+            <div class="stat-label">Participare medie / eveniment</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">💬</div>
+            <div class="stat-value">{{ reports.general.total_feedback }}</div>
+            <div class="stat-label">Total feedback-uri</div>
+        </div>
+        </div>
+        <div class="report-actions">
+          <button class="btn-export-pdf" (click)="exportPdf()" [disabled]="!reports">
+            📄 Exportă raport PDF
+          </button>
+        </div>
+
+        <div class="reports-grid">
+                <div class="report-card">
+                    <h3>📅 Evenimente pe lună</h3>
+                    <div class="bar-chart">
+                    <div class="bar-item" *ngFor="let item of reports.events_per_month">
+                        <div class="bar-wrap">
+                        <div class="bar-fill"
+                            [style.height.%]="(item.count / getMaxCount(reports.events_per_month)) * 100">
+                            <span class="bar-value">{{ item.count }}</span>
+                        </div>
+                        </div>
+                        <div class="bar-label">{{ getMonthName(item.month) }} {{ item.year }}</div>
+                    </div>
+                    </div>
+                </div>
+                <div class="report-card">
+                    <h3>🏷️ Evenimente pe categorie</h3>
+                    <div class="horizontal-bars">
+                    <div class="h-bar-item" *ngFor="let item of reports.events_per_category">
+                        <div class="h-bar-label">{{ item.category }}</div>
+                        <div class="h-bar-track">
+                        <div class="h-bar-fill"
+                            [style.width.%]="(item.count / getMaxCount(reports.events_per_category)) * 100">
+                        </div>
+                        </div>
+                        <div class="h-bar-count">{{ item.count }}</div>
+                    </div>
+                    </div>
+                </div>
+                <div class="report-card">
+                    <h3>📊 Evenimente pe status</h3>
+                    <div class="status-list">
+                    <div class="status-item" *ngFor="let item of reports.events_per_status">
+                        <span class="status-name">{{ getStatusLabel(item.status) }}</span>
+                        <div class="status-bar-track">
+                        <div class="status-bar-fill"
+                            [style.width.%]="(item.count / getMaxCount(reports.events_per_status)) * 100">
+                        </div>
+                        </div>
+                        <span class="status-count">{{ item.count }}</span>
+                    </div>
+                    </div>
+                </div>
+                <div class="report-card">
+                    <h3>🏆 Top organizatori</h3>
+                    <div class="organizer-list">
+                        <div class="organizer-item" *ngFor="let item of reports.events_per_organizer; let i = index">
+                            <div class="organizer-rank">{{ i + 1 }}</div>
+                            <div class="organizer-avatar">{{ item.name[0] }}</div>
+                            <div class="organizer-info">
+                            <strong>{{ item.name }}</strong>
+                            <small>{{ item.email }}</small>
+                            </div>
+                            <div class="organizer-count">
+                            <span>{{ item.count }}</span>
+                            <small>evenimente</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Preview Dialog -->
+<div class="dialog-overlay" *ngIf="showEventPreview" (click)="closePreview()">
+  <div class="preview-dialog" (click)="$event.stopPropagation()">
+    <div class="dialog-header">
+      <div class="dialog-icon">📋</div>
+      <div>
+        <h3>{{ previewEvent?.title }}</h3>
+        <p>Organizator: {{ previewEvent?.organizer_name }}</p>
+      </div>
+      <button class="dialog-close" (click)="closePreview()">✕</button>
+    </div>
+
+    <div class="preview-body">
+      <p class="preview-description">{{ previewEvent?.description }}</p>
+      <div class="preview-meta-grid">
+        <div class="preview-meta-item">
+          <small>DATA ÎNCEPUT</small>
+          <strong>{{ formatDate(previewEvent?.start_datetime) }}</strong>
+        </div>
+        <div class="preview-meta-item">
+          <small>DATA SFÂRȘIT</small>
+          <strong>{{ formatDate(previewEvent?.end_datetime) }}</strong>
+        </div>
+        <div class="preview-meta-item">
+          <small>LOCAȚIE</small>
+          <strong>{{ previewEvent?.location || '—' }}</strong>
+        </div>
+        <div class="preview-meta-item">
+          <small>MOD</small>
+          <strong>{{ previewEvent?.participation_mode }}</strong>
+        </div>
+        <div class="preview-meta-item">
+          <small>CATEGORIE</small>
+          <strong>{{ previewEvent?.category }}</strong>
+        </div>
+        <div class="preview-meta-item">
+          <small>FACULTATE</small>
+          <strong>{{ previewEvent?.faculty }}</strong>
+        </div>
+        <div class="preview-meta-item">
+          <small>INTRARE</small>
+          <strong>{{ getEntryTypeLabel(previewEvent?.entry_type) }}</strong>
+        </div>
+        <div class="preview-meta-item">
+          <small>MAX PARTICIPANȚI</small>
+          <strong>{{ previewEvent?.max_participants || 'Nelimitat' }}</strong>
+        </div>
+      </div>
+    </div>
+
+    <div class="preview-footer">
+      <button class="btn-approve" (click)="approveEvent(previewEvent.id)">✅ Aprobă evenimentul</button>
+      <button class="btn-reject" (click)="openRejectDialog(previewEvent.id)">❌ Respinge</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- Reject Dialog -->
+<div class="dialog-overlay" *ngIf="showRejectDialog" (click)="showRejectDialog = false">
+  <div class="reject-dialog" (click)="$event.stopPropagation()">
+    <div class="dialog-header">
+      <div class="dialog-icon">❌</div>
+      <div>
+        <h3>Respinge evenimentul</h3>
+        <p>Motivul va fi trimis organizatorului</p>
+      </div>
+      <button class="dialog-close" (click)="showRejectDialog = false">✕</button>
+    </div>
+    <div class="dialog-body">
+      <div class="field">
+        <label>Motiv respingere *</label>
+        <textarea
+          [(ngModel)]="rejectReason"
+          placeholder="Ex: Informațiile sunt incomplete, data nu este validă..."
+          rows="4"
+        ></textarea>
+      </div>
+    </div>
+    <div class="dialog-footer-participants">
+      <button class="btn-reject" (click)="confirmReject()" [disabled]="!rejectReason.trim()">
+        ❌ Confirmă respingerea
+      </button>
+      <button class="btn-cancel-plain" (click)="showRejectDialog = false">Anulează</button>
+    </div>
+  </div>
+</div>

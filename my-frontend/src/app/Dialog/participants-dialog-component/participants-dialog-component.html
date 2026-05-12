@@ -1,0 +1,87 @@
+<div class="dialog-overlay" (click)="close()">
+  <div class="participants-dialog" (click)="$event.stopPropagation()">
+
+    <!-- Header -->
+    <div class="dialog-header">
+      <div class="dialog-icon">👥</div>
+      <div>
+        <h3>Participanți</h3>
+        <p>{{ participants.length }} persoane înregistrate</p>
+      </div>
+      <button class="dialog-close" (click)="close()">✕</button>
+    </div>
+
+    <!-- Loading -->
+    <div class="participants-loading" *ngIf="isLoading">
+      <div class="spinner"></div>
+      <p>Se încarcă participanții...</p>
+    </div>
+
+    <!-- Body -->
+    <div class="participants-body" *ngIf="!isLoading">
+
+      <!-- Sumar -->
+      <div class="participants-summary">
+        <div class="summary-chip summary-registered">
+          ✅ {{ countByStatus('registered') }} înregistrați
+        </div>
+        <div class="summary-chip summary-waitlist">
+          ⏳ {{ countByStatus('waitlist') }} waitlist
+        </div>
+        <div class="summary-chip summary-attended">
+          🎫 {{ countByStatus('attended') }} prezenți
+        </div>
+      </div>
+
+      <!-- Tabel -->
+      <div class="participants-table-wrap">
+        <table class="participants-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Nume</th>
+              <th>Email</th>
+              <th>Status</th>
+              <th>Înregistrat la</th>
+              <th>Check-in</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let p of participants; let i = index">
+              <td class="td-index">{{ i + 1 }}</td>
+              <td class="td-name">
+                <div class="participant-avatar">{{ p.full_name[0] }}</div>
+                {{ p.full_name }}
+              </td>
+              <td class="td-email">{{ p.email }}</td>
+              <td>
+                <span class="status-chip" [ngClass]="getStatusClass(p.status)">
+                  {{ getStatusLabel(p.status, p.waitlist_position) }}
+                </span>
+              </td>
+              <td class="td-date">{{ formatDate(p.registered_at) }}</td>
+              <td class="td-checkin">
+                <span *ngIf="p.checked_in" class="checkin-yes">✓</span>
+                <span *ngIf="!p.checked_in" class="checkin-no">—</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- Gol -->
+        <div class="no-participants" *ngIf="participants.length === 0">
+          <p>😕 Niciun participant înregistrat încă.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="dialog-footer">
+      <button class="btn-export" (click)="exportCsv()" [disabled]="!participants.length">
+        📥 Export CSV
+      </button>
+      <button class="btn-close" (click)="close()">Închide</button>
+    </div>
+
+  </div>
+</div>
