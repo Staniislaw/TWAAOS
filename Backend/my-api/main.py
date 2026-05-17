@@ -5,7 +5,7 @@ from fastapi.staticfiles import StaticFiles
 import os
 from auth.jwt_handler import create_access_token
 from auth.google_auth import get_google_auth_url, get_google_token, get_google_user
-from routes import protected,users,events,auth,admin
+from routes import protected,users,events,auth,admin,ai_scraper
 from pydantic import BaseModel
 from database.database import engine, SessionLocal
 from database import models
@@ -29,6 +29,7 @@ app.include_router(users.router)
 app.include_router(events.router)
 app.include_router(auth.router)
 app.include_router(admin.router)
+app.include_router(ai_scraper.router)
 
 
 class LoginRequest(BaseModel):

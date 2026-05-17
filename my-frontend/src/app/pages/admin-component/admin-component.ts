@@ -19,7 +19,7 @@ export class AdminComponent implements OnInit {
   isLoadingReports = false;
   rejectedEvents: any[] = [];
   isLoadingRejected = false;
-  activeTab: 'users' | 'events' | 'rejected'|'reports' = 'users';
+  activeTab: 'users' | 'events' | 'rejected'|'reports'| 'scraper' = 'users';
   // Users
   users: any[] = [];
   filteredUsers: any[] = [];
@@ -38,6 +38,16 @@ export class AdminComponent implements OnInit {
   // Dialog event preview
   showEventPreview = false;
   previewEvent: any = null;
+
+  scrapedEvents: any[] = [];
+  isLoadingScrape = false;
+  scrapeUrl = 'https://www.orasulsuceava.ro/evenimente/';
+  scrapeError = '';
+  showScrapeResult = false;
+
+  importedEventIds: Set<number> = new Set();
+  isImporting: Set<number> = new Set();
+
 
   constructor(
     private adminService: AdminService,
@@ -388,5 +398,48 @@ export class AdminComponent implements OnInit {
   private isEven(n: number): boolean {
     return n % 2 === 0;
   }
+  scrapeEvents(): void {
+    this.isLoadingScrape = true;
+    this.scrapeError = '';
+    this.scrapedEvents = [];
+    
+    this.adminService.scrapeEvents(this.scrapeUrl).subscribe({
+      next: (res) => {
+        this.scrapedEvents = res.events;
+        this.showScrapeResult = true;
+        this.isLoadingScrape = false;
+      },
+      error: (err) => {
+        this.scrapeError = err.error?.detail || 'Eroare la scraping.';
+        this.isLoadingScrape = false;
+      }
+    });
+  }
+  importEvent(event: any, index: number): void {
+    this.isImporting.add(index);
+    this.adminService.importScrapedEvent(event).subscribe({
+      next: () => {
+        this.importedEventIds.add(index);
+        this.isImporting.delete(index);
+      },
+      error: (err) => {
+        console.error('Eroare import:', err);
+        this.isImporting.delete(index);
+      }
+    });
+  }
+  editScrapedEvent(ev: any): void {
+    const description = ev.price 
+      ? `${ev.description || ''}\n💰 Preț: ${ev.price}`.trim()
+      : ev.description;
 
+    sessionStorage.setItem('scraped_event', JSON.stringify({
+      title: ev.title,
+      description: description,
+      start_datetime: ev.start_datetime,
+      location: ev.location,
+      entry_type: ev.entry_type === 'free' ? 'free' : 'registration',
+    }));
+    this.router.navigate(['/events/create']);
+  }
 }

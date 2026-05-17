@@ -36,6 +36,9 @@
         <button class="tab" [class.active]="activeTab === 'reports'" (click)="activeTab = 'reports'">
             📊 Rapoarte
         </button>
+        <button class="tab" [class.active]="activeTab === 'scraper'"  (click)="activeTab = 'scraper'">
+          🤖 AI Scraper
+        </button>
     </div>
 
     <!-- TAB USERS -->
@@ -281,6 +284,75 @@
             </div>
         </div>
     </div>
+
+    <div *ngIf="activeTab === 'scraper'">
+  
+    <div class="scraper-header">
+      <h2>🤖 Import evenimente cu AI</h2>
+      <p>Extrage automat evenimente de pe orice site local folosind Gemini AI.</p>
+    </div>
+
+    <div class="scraper-input-row">
+      <input 
+        type="text" 
+        [(ngModel)]="scrapeUrl" 
+        placeholder="https://www.orasulsuceava.ro/evenimente/"
+        class="scraper-url-input"
+      />
+      <button 
+        class="btn-scrape" 
+        (click)="scrapeEvents()" 
+        [disabled]="isLoadingScrape">
+        {{ isLoadingScrape ? '⏳ Se procesează...' : '🔍 Extrage evenimente' }}
+      </button>
+    </div>
+
+    <div class="loading" *ngIf="isLoadingScrape">
+      <div class="spinner"></div>
+      <p>Gemini AI analizează site-ul...</p>
+    </div>
+
+    <div class="scrape-error" *ngIf="scrapeError">
+      ⚠️ {{ scrapeError }}
+    </div>
+
+    <div *ngIf="showScrapeResult && !isLoadingScrape">
+      <div class="no-results" *ngIf="scrapedEvents.length === 0">
+        <p>🤷 Nu au fost găsite evenimente pe pagina respectivă.</p>
+      </div>
+
+      <div class="scraped-grid" *ngIf="scrapedEvents.length > 0">
+        <p class="scrape-count">✅ {{ scrapedEvents.length }} evenimente găsite</p>
+        
+        <div class="scraped-card" *ngFor="let ev of scrapedEvents; let i = index">
+          <h3>{{ ev.title }}</h3>
+          <p *ngIf="ev.description">{{ ev.description }}</p>
+          <div class="scraped-meta">
+            <span *ngIf="ev.start_datetime">📅 {{ ev.start_datetime }}</span>
+            <span *ngIf="ev.location">📍 {{ ev.location }}</span>
+            <span *ngIf="ev.entry_type === 'free'">🟢 Intrare liberă</span>
+            <span *ngIf="ev.entry_type === 'paid'">💰 {{ ev.price || 'Cu plată' }}</span>
+          </div>
+
+          <!-- ADAUGĂ BUTONUL AICI, după scraped-meta -->
+          <div class="scraped-actions">
+            <button
+                class="btn-approve"
+                (click)="importEvent(ev, i)"
+                [disabled]="importedEventIds.has(i) || isImporting.has(i)">
+                <span *ngIf="isImporting.has(i)">⏳ Se importă...</span>
+                <span *ngIf="importedEventIds.has(i) && !isImporting.has(i)">✅ Importat</span>
+                <span *ngIf="!importedEventIds.has(i) && !isImporting.has(i)">📥 Importă</span>
+              </button>
+              <button class="btn-edit-scraped" (click)="editScrapedEvent(ev)">
+                ✏️ Editează & Creează
+              </button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
 
   </main>
 </div>

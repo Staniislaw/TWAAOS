@@ -90,6 +90,22 @@ export class CreateEventComponent {
           this.existingMaterials = event.materials || [];
         }
       });
+    } else {
+      const scraped = sessionStorage.getItem('scraped_event');
+      if (scraped) {
+        const data = JSON.parse(scraped);
+        this.eventForm = {
+          ...this.eventForm,
+          title: data.title || '',
+          description: data.description || '',
+          location: data.location || '',
+          entry_type: data.entry_type || 'free',
+          start_datetime: data.start_datetime 
+            ? this.toDatetimeLocal(data.start_datetime) 
+            : '',
+        };
+        sessionStorage.removeItem('scraped_event'); 
+      }
     }
   }
   toDatetimeLocal(dateStr: string): string {
