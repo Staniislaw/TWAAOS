@@ -8,6 +8,7 @@ import { AuthCallbackComponent } from './pages/auth-callback-component/auth-call
 import { AuthGuard } from './Guard/guards/auth-guard';
 import { AdminComponent } from './pages/admin-component/admin-component';
 import { AdminGuard } from './Guard/AdminGuard';
+import { MyRegistrations } from './pages/my-registrations/my-registrations';
 
 export const routes: Routes = [
   { path: '', redirectTo: 'login', pathMatch: 'full' },
@@ -37,6 +38,10 @@ export const routes: Routes = [
     path: 'events/:id/edit', component: CreateEventComponent ,
     canActivate: [AuthGuard],
     data: { roles: ['organizer','admin'] }
+  },
+  {
+  path: 'my-registrations',
+    component: MyRegistrations
   },
   {
     path: 'events/:id',

@@ -164,4 +164,10 @@ export class EventService {
       { headers: this.getHeaders() }
     );
   }
+  getMyRegistrations(): Observable<any[]> {
+    return this.http.get<any[]>(
+      `${this.apiUrl}/my/registrations`,
+      { headers: this.getHeaders() }
+    );
+  }
 }

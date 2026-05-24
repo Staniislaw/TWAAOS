@@ -1045,3 +1045,22 @@ def sanitize_filename(filename: str) -> str:
     name = re.sub(r'[^\w\-]', '_', name)
     name = re.sub(r'_+', '_', name)
     return f"{name}{ext}"
+
+
+@router.get("/my/registrations")
+def get_my_registrations(db: DbSession, user: CurrentUser) -> list:
+    registrations = db.query(models.EventRegistration).filter(
+        models.EventRegistration.user_id == user["user_id"],
+        models.EventRegistration.status.in_(["registered", "waitlist", "attended"])
+    ).all()
+
+    result = []
+    for r in registrations:
+        event_data = serialize_event_full(r.event)
+        event_data["registration_status"] = r.status
+        event_data["waitlist_position"] = r.waitlist_position
+        event_data["registered_at"] = str(r.registered_at)
+        event_data["checked_in"] = r.checked_in
+        result.append(event_data)
+
+    return result

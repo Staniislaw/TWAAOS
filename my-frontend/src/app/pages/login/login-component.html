@@ -32,7 +32,7 @@
             type="text"
             [(ngModel)]="username"
             placeholder="Username"
-            (keyup.enter)="login()"
+            (keyup.enter)="activeTab === 'signin' ? login() : register()"
           />
         </div>
       </div>

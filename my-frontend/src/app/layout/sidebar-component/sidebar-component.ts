@@ -15,10 +15,7 @@ export class SidebarComponent {
 
   navItems = [
     { label: 'Evenimente', icon: '📅', route: '/events' },
-    { label: 'Home', icon: '🏠', route: '/home' },
     { label: 'Înregistrările mele', icon: '📋', route: '/my-registrations' },
-    { label: 'Materiale', icon: '📁', route: '/materials' },
-    { label: 'Feedback', icon: '⭐', route: '/feedback' },
     { route: '/admin', icon: '⚙️', label: 'Admin', adminOnly: true }
   ]; 
 

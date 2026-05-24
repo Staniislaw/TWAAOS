@@ -44,9 +44,18 @@ export class LoginComponent {
 
     this.authService.register(this.username, this.password).subscribe({
       next: () => {
-        this.errorMessage = 'Cont creat! Acum te poți loga.';
-        this.activeTab = 'signin';
-        this.isLoading = false;
+        this.authService.login(this.username, this.password).subscribe({
+          next: (response) => {
+            this.authService.saveToken(response.access_token);
+            this.router.navigate(['/events']);
+            this.isLoading = false;
+          },
+          error: () => {
+            this.errorMessage = 'Cont creat! Autentificarea a eșuat, încearcă manual.';
+            this.activeTab = 'signin';
+            this.isLoading = false;
+          }
+        });
       },
       error: () => {
         this.errorMessage = 'User deja există';
