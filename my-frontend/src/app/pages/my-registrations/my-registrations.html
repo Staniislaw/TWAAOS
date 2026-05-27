@@ -1,0 +1,78 @@
+<div class="page-wrapper">
+  <app-sidebar-component></app-sidebar-component>
+
+  <main class="main-content">
+    <div class="bg-mesh"></div>
+
+    <div class="page-header">
+      <div class="header-title">
+        <span class="page-label">CONT MEU</span>
+        <h1>Înregistrările <span class="highlight">mele</span></h1>
+      </div>
+    </div>
+
+    <div class="loading-glass" *ngIf="isLoading">
+      <div class="spinner-ring"></div>
+      <p>Se încarcă înregistrările...</p>
+    </div>
+
+    <div class="error-msg" *ngIf="errorMessage">{{ errorMessage }}</div>
+
+    <div class="events-grid" *ngIf="!isLoading">
+
+      <div class="no-results" *ngIf="registrations.length === 0">
+        <span class="material-icons no-results-icon">event_busy</span>
+        <p>Nu ești înscris la niciun eveniment.</p>
+      </div>
+
+      <div
+        class="event-card"
+        *ngFor="let reg of registrations"
+        (click)="goToEvent(reg.id)"
+      >
+        <div class="card-cover"
+          [style.background]="'linear-gradient(135deg, ' + getCoverColor(reg.category) + ')'">
+          <span class="category-badge">{{ reg.category }}</span>
+          <span class="registration-status-badge" [class]="getStatusClass(reg.registration_status)">
+            {{ getStatusLabel(reg.registration_status) }}
+          </span>
+        </div>
+
+        <div class="card-body">
+          <div class="card-meta">
+            <span class="meta-chip">
+              <span class="material-icons meta-icon">schedule</span>
+              {{ formatDate(reg.start_datetime) }}
+            </span>
+            <span class="meta-chip">
+              <span class="material-icons meta-icon">location_on</span>
+              {{ reg.location || '—' }}
+            </span>
+          </div>
+
+          <h3 class="card-title">{{ reg.title }}</h3>
+          <p class="card-description">{{ reg.description }}</p>
+
+          <div class="waitlist-info" *ngIf="reg.registration_status === 'waitlist'">
+            <span class="material-icons">hourglass_top</span>
+            Poziția ta în lista de așteptare: <strong>#{{ reg.waitlist_position }}</strong>
+          </div>
+
+          <div class="card-actions">
+            <button
+              class="btn-action btn-details"
+              (click)="goToEvent(reg.id); $event.stopPropagation()">
+              <span class="material-icons">open_in_new</span> Detalii
+            </button>
+            <button
+              class="btn-action btn-delete"
+              *ngIf="reg.registration_status !== 'attended'"
+              (click)="unregister(reg.id, $event)">
+              <span class="material-icons">person_remove</span> Dezînscrie-te
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
