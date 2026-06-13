@@ -365,53 +365,56 @@ def delete_event(event_id: int, db: DbSession, user: CurrentUser) -> dict:
 
 @router.get("/{event_id}/materials")
 def get_event_materials(event_id: int, db: DbSession) -> list:
-    """
-    Returneaza lista materialelor atasate unui eveniment.
-
-    Args:
-        event_id (int): ID-ul evenimentului.
-        db (Session): Sesiunea bazei de date.
-
-    Returns:
-        list[EventMaterial]: Lista obiectelor EventMaterial asociate evenimentului.
-    """
-    return db.query(models.EventMaterial).filter(
+    materials = db.query(models.EventMaterial).filter(
         models.EventMaterial.event_id == event_id
     ).all()
+    return [
+        {
+            "id": m.id,
+            "event_id": m.event_id,
+            "file_name": m.file_name,
+            "file_type": m.file_type,
+            "file_size_kb": m.file_size_kb,
+            "file_path": m.file_path,
+        }
+        for m in materials
+    ]
 
 
+# events.py
 @router.get("/{event_id}/feedback")
 def get_event_feedback(event_id: int, db: DbSession) -> list:
-    """
-    Returneaza toate feedback-urile primite pentru un eveniment.
-
-    Args:
-        event_id (int): ID-ul evenimentului.
-        db (Session): Sesiunea bazei de date.
-
-    Returns:
-        list[EventFeedback]: Lista obiectelor EventFeedback asociate evenimentului.
-    """
-    return db.query(models.EventFeedback).filter(
+    feedbacks = db.query(models.EventFeedback).filter(
         models.EventFeedback.event_id == event_id
     ).all()
+    return [
+        {
+            "id": f.id,
+            "event_id": f.event_id,
+            "user_id": f.user_id,
+            "rating": f.rating,
+            "comment": f.comment,
+            "created_at": str(f.created_at)
+        }
+        for f in feedbacks
+    ]
 
 
 @router.get("/{event_id}/sponsors")
 def get_event_sponsors(event_id: int, db: DbSession) -> list:
-    """
-    Returneaza lista sponsorilor unui eveniment.
-
-    Args:
-        event_id (int): ID-ul evenimentului.
-        db (Session): Sesiunea bazei de date.
-
-    Returns:
-        list[EventSponsor]: Lista obiectelor EventSponsor asociate evenimentului.
-    """
-    return db.query(models.EventSponsor).filter(
+    sponsors = db.query(models.EventSponsor).filter(
         models.EventSponsor.event_id == event_id
     ).all()
+    return [
+        {
+            "id": s.id,
+            "event_id": s.event_id,
+            "name": s.name,
+            "logo_path": s.logo_path,
+            "website_url": s.website_url,
+        }
+        for s in sponsors
+    ]
 
 
 @router.post("/{event_id}/register")
@@ -632,30 +635,24 @@ def unregister_from_event(event_id: int, db: DbSession, user: CurrentUser) -> di
 
 
 @router.post("/{event_id}/feedback")
-def submit_feedback(event_id: int, feedback_data: dict, db: DbSession) -> dict:
-    """
-    Trimite un feedback pentru un eveniment.
-
-    Args:
-        event_id (int): ID-ul evenimentului pentru care se trimite feedback-ul.
-        feedback_data (dict): Datele feedback-ului. Campuri asteptate:
-            - rating (int): Nota de la 1 la 5.
-            - comment (str, optional): Comentariul textual.
-        db (Session): Sesiunea bazei de date.
-
-    Returns:
-        EventFeedback: Obiectul feedback salvat in baza de date.
-    """
+def submit_feedback(event_id: int, feedback_data: dict, db: DbSession, user: CurrentUser) -> dict:
     feedback = models.EventFeedback(
         event_id=event_id,
-        user_id=1,
+        user_id=user["user_id"],
         rating=feedback_data.get("rating"),
         comment=feedback_data.get("comment"),
     )
     db.add(feedback)
     db.commit()
     db.refresh(feedback)
-    return {"message": "Feedback trimis!", "id": feedback.id}
+    return {
+        "id": feedback.id,
+        "event_id": feedback.event_id,
+        "user_id": feedback.user_id,
+        "rating": feedback.rating,
+        "comment": feedback.comment,
+        "created_at": str(feedback.created_at)
+    }
 
 
 @router.get("/my/ids")

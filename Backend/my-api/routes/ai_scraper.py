@@ -48,6 +48,10 @@ def clean_html(html_content: str) -> str:
     return soup.get_text(separator="\n", strip=True)
 
 async def get_events_from_ai(text_content: str) -> tuple:
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        return [], "GEMINI_API_KEY lipsă din .env"
+
     prompt = f"""Extrage toate evenimentele din textul următor ca JSON valid (listă de obiecte).
 Fiecare obiect să aibă: title, description, start_datetime, location, entry_type, price.
 entry_type este "free" dacă e gratuit, altfel "paid".
@@ -57,35 +61,32 @@ TEXT:
 {text_content[:8000]}"""
 
     try:
-        result = subprocess.run(
-            ["powershell", "-ExecutionPolicy", "Bypass", "-File",
-             r"C:\nvm4w\nodejs\gemini.ps1", "-p", prompt, "-y"],
-            capture_output=True,
-            text=True,
-            timeout=120,
-            encoding="utf-8",
-            cwd=r"C:\ISA-TWAOOS PROJECT\backend"
-        )
-        print(f"[GEMINI returncode]: {result.returncode}")
-        print(f"[GEMINI stdout]: {result.stdout[:300]}")
-        print(f"[GEMINI stderr]: {result.stderr[:300]}")
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}",
+                json={
+                    "contents": [{"parts": [{"text": prompt}]}]
+                }
+            )
+            response.raise_for_status()
+            data = response.json()
+            content = data["candidates"][0]["content"]["parts"][0]["text"].strip()
 
-        if result.returncode != 0:
-            return [], f"Eroare Gemini CLI: {result.stderr[:200]}"
+            # strip markdown dacă Gemini adaugă ```json
+            if "```" in content:
+                content = content.split("```")[1]
+                if content.startswith("json"):
+                    content = content[4:]
 
-        content = result.stdout.strip()
+            if "[" in content and "]" in content:
+                start = content.find("[")
+                end = content.rfind("]") + 1
+                content = content[start:end]
 
-        if "[" in content and "]" in content:
-            start = content.find("[")
-            end = content.rfind("]") + 1
-            content = content[start:end]
+            return json.loads(content), None
 
-        return json.loads(content), None
-
-    except subprocess.TimeoutExpired:
-        return [], "Gemini CLI timeout"
     except Exception as e:
-        return [], f"Eroare: {str(e)}"
+        return [], f"Eroare Gemini API: {str(e)}"
 
 @router.get("/scrape", response_model=ScrapeResponse)
 async def scrape_local_events(url: str = "https://www.orasulsuceava.ro/evenimente/"):
